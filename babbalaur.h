@@ -42,9 +42,9 @@ struct Input
     bool32_t spaceDown;
 };
 
-bool32_t GameInit( Memory* memory );
-bool32_t GameUpdate( Memory* memory, Input* newInput, Input* oldInput, real64_t dt );
-void GameRender( Memory* memory );
+bool32_t GameInit( struct Memory* memory );
+bool32_t GameUpdate( struct Memory* memory, struct Input* newInput, struct Input* oldInput, real64_t dt );
+void GameRender( struct Memory* memory );
 
 #define BABBALAUR_H
 #endif

@@ -20,7 +20,12 @@ typedef glm::mat4 m4;
 
 #else
 
+#import <GLKit/GLKit.h>
 
+typedef GLKVector2 v2;
+typedef GLKVector3 v3;
+typedef GLKVector4 v4;
+typedef GLKMatrix4 m4;
 
 #endif
 
