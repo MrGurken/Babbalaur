@@ -10,6 +10,8 @@
 #ifdef _WIN32
 
 #include "glm.hpp"
+#include "matrix_transform.hpp"
+#include "type_ptr.hpp"
 
 typedef glm::vec2 v2;
 typedef glm::vec3 v3;

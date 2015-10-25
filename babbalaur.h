@@ -7,9 +7,15 @@
    $Notice: (C) Copyright 2014 by SpaceCat, Inc. All Rights Reserved. $
    ======================================================================== */
 
+#include <stdio.h>
 #include <stdint.h>
 #include "maths.h"
 #include "graphics.h"
+
+#if _WIN32
+#include <fstream>
+#else
+#endif
 
 #define WINDOW_X SDL_WINDOWPOS_UNDEFINED
 #define WINDOW_Y SDL_WINDOWPOS_UNDEFINED
@@ -40,6 +46,42 @@ struct Input
     bool32_t lmbDown;
     bool32_t rmbDown;
     bool32_t spaceDown;
+};
+
+#define SHADER_MAX_UNIFORMS 14
+struct Shader
+{
+    GLuint program;
+    GLuint uniforms[SHADER_MAX_UNIFORMS];
+    int nuniforms;
+};
+
+struct Vertex
+{
+    real32_t x, y, z;
+    real32_t u, v;
+};
+
+struct Mesh
+{
+    GLuint vao;
+    GLuint vbo;
+    GLuint ibo;
+    int size;
+};
+
+struct Camera
+{
+    v3 position;
+    m4 projection;
+    m4 view;
+};
+
+struct Gamestate
+{
+    Mesh mesh;
+    Shader shader;
+    Camera camera;
 };
 
 bool32_t GameInit( struct Memory* memory );

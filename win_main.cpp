@@ -6,7 +6,7 @@
    $Notice: (C) Copyright 2014 by SpaceCat, Inc. All Rights Reserved. $
    ======================================================================== */
 
-#include "babbalaur.cpp"
+#include "babbalaur.m"
 #include "SDL.h"
 
 int main( int argc, char* argv[] )
@@ -24,6 +24,10 @@ int main( int argc, char* argv[] )
         SDL_GLContext context = SDL_GL_CreateContext( window );
         if( context )
         {
+            glewExperimental = GL_TRUE;
+            if( glewInit() != GLEW_OK )
+                return -1;
+            
             Memory memory;
             memory.size = KILOBYTES(2);
             memory.pointer = malloc( memory.size );
