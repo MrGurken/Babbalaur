@@ -8,6 +8,7 @@
 
 #include "babbalaur.h"
 
+#ifdef _WIN32
 bool32_t ReadFile( const char* file, Memory* memory )
 {
     bool32_t result = false;
@@ -31,8 +32,23 @@ bool32_t ReadFile( const char* file, Memory* memory )
 
     return result;
 }
+#else
+bool32_t ReadFile( const char* file, struct Memory* memory )
+{
+	bool32_t result = false;
+	
+	NSString* str = [NSString stringWithContentsOfFile:[NSString stringWithUTF8String:file] encoding:NSUTF8StringEncoding error:nil];
+	if( str.length < memory->size )
+	{
+		memcpy( memory->pointer, [str UTF8String], str.length );
+		result = true;
+	}
+	
+	return result;
+}
+#endif
 
-bool32_t CreateShader( Shader* shader )
+bool32_t CreateShader( struct Shader* shader )
 {
     shader->program = glCreateProgram();
     shader->nuniforms = 0;
@@ -40,7 +56,7 @@ bool32_t CreateShader( Shader* shader )
     return true;
 }
 
-bool32_t MemShader( Shader* shader, const char* source, GLenum type )
+bool32_t MemShader( struct Shader* shader, const char* source, GLenum type )
 {
     bool32_t result = true;
     
@@ -69,14 +85,14 @@ bool32_t MemShader( Shader* shader, const char* source, GLenum type )
     return result;
 }
 
-bool32_t LoadShader( Shader* shader, Memory* memory, const char* file, GLenum type )
+bool32_t LoadShader( struct Shader* shader, struct Memory* memory, const char* file, GLenum type )
 {
     if( ReadFile( file, memory ) )
         return MemShader( shader, (const char*)memory->pointer, type );
     return false;
 }
 
-bool32_t LinkShader( Shader* shader )
+bool32_t LinkShader( struct Shader* shader )
 {
     bool32_t result = true;
     glLinkProgram( shader->program );
@@ -97,7 +113,7 @@ bool32_t LinkShader( Shader* shader )
     return result;
 }
 
-bool32_t AddUniform( Shader* shader, const char* uniform )
+bool32_t AddUniform( struct Shader* shader, const char* uniform )
 {
     bool32_t result = false;
     
@@ -108,10 +124,15 @@ bool32_t AddUniform( Shader* shader, const char* uniform )
     return result;
 }
 
-bool32_t CreateMesh( Mesh* mesh )
+bool32_t CreateMesh( struct Mesh* mesh )
 {
+#ifdef _WIN32
     glGenVertexArrays( 1, &mesh->vao );
     glBindVertexArray( mesh->vao );
+#else
+	glGenVertexArraysOES( 1, &mesh->vao );
+	glBindVertexArrayOES( mesh->vao );
+#endif
 
     glGenBuffers( 1, &mesh->vbo );
     glBindBuffer( GL_ARRAY_BUFFER, mesh->vbo );
@@ -122,48 +143,74 @@ bool32_t CreateMesh( Mesh* mesh )
     glEnableVertexAttribArray( 0 );
     glEnableVertexAttribArray( 1 );
 
-    glVertexAttribPointer( 0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0 );
-    glVertexAttribPointer( 1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(GLfloat)*3) );
+    glVertexAttribPointer( 0, 3, GL_FLOAT, GL_FALSE, sizeof(struct Vertex), 0 );
+    glVertexAttribPointer( 1, 2, GL_FLOAT, GL_FALSE, sizeof(struct Vertex), (void*)(sizeof(GLfloat)*3) );
 
     glBindBuffer( GL_ARRAY_BUFFER, 0 );
     glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
+#ifdef _WIN32
     glBindVertexArray( 0 );
-    
+#else
+	glBindVertexArrayOES( 0 );
+#endif
+	
     mesh->size = 0;
     return true;
 }
 
-bool32_t BufferMesh( Mesh* mesh, Vertex* v, int nv, GLuint* i, int ni )
+bool32_t BufferMesh( struct Mesh* mesh, struct Vertex* v, int nv, GLuint* i, int ni )
 {
+#ifdef _WIN32
+	glBindVertexArray( mesh->vao );
+#else
+	glBindVertexArrayOES( mesh->vao );
+#endif
+	
     glBindBuffer( GL_ARRAY_BUFFER, mesh->vbo );
-    glBufferData( GL_ARRAY_BUFFER, sizeof(Vertex)*nv, v, GL_STATIC_DRAW );
+    glBufferData( GL_ARRAY_BUFFER, sizeof(struct Vertex)*nv, v, GL_STATIC_DRAW );
 
     glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, mesh->ibo );
     glBufferData( GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint)*ni, i, GL_STATIC_DRAW );
 
     glBindBuffer( GL_ARRAY_BUFFER, 0 );
     glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
-    glBindVertexArray( 0 );
+	
+#ifdef _WIN32
+	glBindVertexArray( 0 );
+#else
+    glBindVertexArrayOES( 0 );
+#endif
 
     mesh->size = ni;
 
     return true;
 }
 
-void RenderMesh( Mesh* mesh )
+void RenderMesh( struct Mesh* mesh )
 {
-    glBindVertexArray( mesh->vao );
+#ifdef _WIN32
+	glBindVertexArray( mesh->vao );
+#else
+	glBindVertexArrayOES( mesh->vao );
+#endif
     glBindBuffer( GL_ARRAY_BUFFER, mesh->vbo );
     glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, mesh->ibo );
     glDrawElements( GL_TRIANGLES, mesh->size, GL_UNSIGNED_INT, 0 );
 }
 
-bool32_t CreateCamera( Camera* camera )
+bool32_t CreateCamera( struct Camera* camera )
 {
     camera->position.x = camera->position.y = camera->position.z = 0.0f;
-    // TODO: Make platform independent
+
+#ifdef _WIN32
     camera->projection = glm::ortho( 0.0f, (real32_t)WINDOW_W, (real32_t)WINDOW_H, 0.0f, -1.0f, 1.0f );
     camera->view = m4();
+#else
+	//camera->projection = GLKMatrix4MakeOrtho( 0.0f, (real32_t)WINDOW_W, (real32_t)WINDOW_H, 0.0f, -1.0f, 1.0f );
+	CGRect bounds = [[UIScreen mainScreen] bounds];
+	camera->projection = GLKMatrix4MakeOrtho( 0.0f, bounds.size.width, bounds.size.height, 0.0f, -1.0f, 1.0f );
+	camera->view = GLKMatrix4Identity;
+#endif
 
     return true;
 }
@@ -172,9 +219,9 @@ bool32_t GameInit( struct Memory* memory )
 {
     bool32_t result = true;
     
-    Gamestate* g = (Gamestate*)memory->pointer;
+    struct Gamestate* g = (struct Gamestate*)memory->pointer;
 
-    Vertex vdata[] =
+    struct Vertex vdata[] =
     {
         /*{ 0, 0, 0, 0.5f, 0.5f },
         { 1, -1, 0, 1.0f, 1.0f },
@@ -193,14 +240,13 @@ bool32_t GameInit( struct Memory* memory )
         result = false;
     if( !BufferMesh( &g->mesh, vdata, 9, idata, 3 ) )
         result = false;
-
-    const char* vsource = "#version 330\nlayout (location=0) in vec3 PositionIn;"
-        "uniform mat4 ProjectionMatrix;"
-        "uniform mat4 ViewMatrix;"
-        "uniform mat4 ModelMatrix;"
-        "void main() { gl_Position = ProjectionMatrix * ViewMatrix * ModelMatrix * vec4( PositionIn, 1.0 ); }";
-    const char* fsource = "#version 330\nout vec4 FragColor;"
-        "void main() { FragColor = vec4( 0.0, 0.0, 1.0, 1.0 ); }";
+	
+	const char* vsource = "attribute vec3 PositionIn;"
+	"uniform mat4 ProjectionMatrix;"
+	"uniform mat4 ViewMatrix;"
+	"uniform mat4 ModelMatrix;"
+	"void main() { gl_Position = ProjectionMatrix * ViewMatrix * ModelMatrix * vec4( PositionIn, 1.0 ); }";
+	const char* fsource = "void main() { gl_FragColor = vec4( 0.0, 0.0, 1.0, 1.0 ); }";
 
     if( !CreateShader( &g->shader ) )
         result = false;
@@ -230,15 +276,20 @@ bool32_t GameUpdate( struct Memory* memory, struct Input* newInput, struct Input
 
 void GameRender( struct Memory* memory )
 {
-    Gamestate* g = (Gamestate*)memory->pointer;
+    struct Gamestate* g = (struct Gamestate*)memory->pointer;
     
     glClearColor( 1.0f, 0.0f, 0.0f, 1.0f );
     glClear( GL_COLOR_BUFFER_BIT );
 
     glUseProgram( g->shader.program );
-    // TODO: Make platform indep.
+#ifdef _WIN32
     glUniformMatrix4fv( g->shader.uniforms[0], 1, GL_FALSE, value_ptr( g->camera.projection ) );
     glUniformMatrix4fv( g->shader.uniforms[1], 1, GL_FALSE, value_ptr( g->camera.view ) );
     glUniformMatrix4fv( g->shader.uniforms[2], 1, GL_FALSE, value_ptr( m4() ) );
+#else
+	glUniformMatrix4fv( g->shader.uniforms[0], 1, GL_FALSE, g->camera.projection.m );
+	glUniformMatrix4fv( g->shader.uniforms[1], 1, GL_FALSE, g->camera.view.m );
+	glUniformMatrix4fv( g->shader.uniforms[2], 1, GL_FALSE, GLKMatrix4Identity.m );
+#endif
     RenderMesh( &g->mesh );
 }

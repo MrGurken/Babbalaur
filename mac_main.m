@@ -8,6 +8,7 @@
 
 #import <UIKit/UIKit.h>
 #import <GLKit/GLKit.h>
+#include "babbalaur.h"
 
 @interface GameViewController : GLKViewController
 
@@ -15,7 +16,9 @@
 
 @interface GameViewController()
 {
-	
+	struct Memory memory;
+	struct Input newInput;
+	struct Input oldInput;
 }
 @property (strong, nonatomic) EAGLContext* context;
 
@@ -42,10 +45,18 @@
 	view.drawableDepthFormat = GLKViewDrawableDepthFormat24;
 	
 	[self startGL];
+	
+	memory.size = KILOBYTES(2);
+	memory.pointer = malloc( memory.size );
+	
+	GameInit( &memory );
 }
 
 -(void)dealloc
 {
+	free( memory.pointer );
+	memory.size = 0;
+	
 	[self stopGL];
 	
 	if([EAGLContext currentContext] == self.context)
@@ -85,13 +96,12 @@
 
 -(void)update
 {
-	
+	GameUpdate( &memory, &newInput, &oldInput, GAME_DT );
 }
 
 -(void)glkView:(GLKView *)view drawInRect:(CGRect)rect
 {
-	glClearColor( 1.0f, 0.0f, 0.0f, 1.0f );
-	glClear( GL_COLOR_BUFFER_BIT );
+	GameRender( &memory );
 }
 
 @end

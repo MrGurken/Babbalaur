@@ -79,9 +79,9 @@ struct Camera
 
 struct Gamestate
 {
-    Mesh mesh;
-    Shader shader;
-    Camera camera;
+    struct Mesh mesh;
+    struct Shader shader;
+    struct Camera camera;
 };
 
 bool32_t GameInit( struct Memory* memory );
