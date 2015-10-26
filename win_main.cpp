@@ -58,14 +58,14 @@ int main( int argc, char* argv[] )
                             running = false;
                         else if( e.type == SDL_KEYDOWN )
                         {
-                            if( e.type == SDLK_ESCAPE )
+                            if( e.key.keysym.sym == SDLK_ESCAPE )
                                 running = false;
-                            else if( e.type == SDLK_SPACE )
+                            else if( e.key.keysym.sym == SDLK_SPACE )
                                 newInput.spaceDown = true;
                         }
                         else if( e.type == SDL_KEYUP )
                         {
-                            if( e.type == SDLK_SPACE )
+                            if( e.key.keysym.sym == SDLK_SPACE )
                                 newInput.spaceDown = false;
                         }
                         else if( e.type == SDL_MOUSEBUTTONDOWN )

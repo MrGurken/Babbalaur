@@ -14,6 +14,8 @@
 
 #if _WIN32
 #include <fstream>
+#include "SDL.h"
+#include "SDL_image.h"
 #else
 #endif
 
@@ -28,6 +30,9 @@
 #define KILOBYTES(n) (1024*n)
 #define MEGABYTES(n) (1024*KILOBYTES(n))
 #define GIGABYTES(n) (1024*MEGABYTES(n))
+
+#define MIN(a,b) (a<b?a:b)
+#define MAX(a,b) (a>b?a:b)
 
 typedef int32_t bool32_t;
 typedef float real32_t;
@@ -49,6 +54,15 @@ struct Input
 };
 
 #define SHADER_MAX_UNIFORMS 14
+enum
+{
+    PROJECTION_MATRIX=0,
+    VIEW_MATRIX,
+    MODEL_MATRIX,
+    UV_OFFSET,
+    UV_LENGTH
+};
+
 struct Shader
 {
     GLuint program;
@@ -60,6 +74,13 @@ struct Vertex
 {
     real32_t x, y, z;
     real32_t u, v;
+};
+
+struct Texture
+{
+    GLuint id;
+    int width;
+    int height;
 };
 
 struct Mesh
@@ -77,11 +98,26 @@ struct Camera
     m4 view;
 };
 
+struct Quad
+{
+    v3 position;
+    v3 scale;
+};
+
+#define TILESHEET_WIDTH 10
+#define TILE_UV_LENGTH ( 1.0f / TILESHEET_WIDTH )
+#define TILE_SIZE 32.0f
+
+#define GAME_MAP_WIDTH 10
+#define GAME_MAP_HEIGHT 10
 struct Gamestate
 {
-    struct Mesh mesh;
+    struct Mesh quadMesh;
     struct Shader shader;
     struct Camera camera;
+    struct Texture texture;
+    uint8_t map[GAME_MAP_HEIGHT][GAME_MAP_WIDTH];
+    struct Memory memory;
 };
 
 bool32_t GameInit( struct Memory* memory );
