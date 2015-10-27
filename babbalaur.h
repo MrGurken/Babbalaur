@@ -16,7 +16,17 @@
 #include <fstream>
 #include "SDL.h"
 #include "SDL_image.h"
+
+#define DIFFUSE_VS_PATH "./shaders/diffuse.vs"
+#define DIFFUSE_FS_PATH "./shaders/diffuse.fs"
+#define TILESHEET_PATH "./textures/tilesheet.png"
+
 #else
+
+#define DIFFUSE_VS_PATH "diffuse"
+#define DIFFUSE_FS_PATH "diffuse"
+#define TILESHEET_PATH "tilesheet"
+
 #endif
 
 #define WINDOW_X SDL_WINDOWPOS_UNDEFINED

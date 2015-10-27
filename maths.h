@@ -29,8 +29,8 @@ float* MatrixValue( const m4* matrix ) { return value_ptr( *matrix ); }*/
 #define MATRIX_IDENTITY m4()
 #define MATRIX_ORTHO( x, y ) glm::ortho( 0.0f, x, y, 0.0f, -1.0f, 1.0f )
 #define MATRIX_MULTIPLY( a, b ) a * b
-#define MATRIX_TRANSLATION( x, y, z ) glm::translate( m4(), vec3( x, y, z ) )
-#define MATRIX_SCALE( x, y, z ) glm::scale( m4(), vec3( x, y, z ) )
+#define MATRIX_TRANSLATION( x, y, z ) glm::translate( m4(), v3( x, y, z ) )
+#define MATRIX_SCALE( x, y, z ) glm::scale( m4(), v3( x, y, z ) )
 
 #else
 

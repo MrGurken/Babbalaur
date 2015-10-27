@@ -12,7 +12,7 @@
 bool32_t ReadFile( const char* file, const char* fileType, struct Memory* memory )
 {
     bool32_t result = false;
-
+    
     std::ifstream stream( file, std::ios::in | std::ios::binary );
     if( stream.is_open() )
     {
@@ -35,18 +35,18 @@ bool32_t ReadFile( const char* file, const char* fileType, struct Memory* memory
 #else
 bool32_t ReadFile( const char* file, const char* fileType, struct Memory* memory )
 {
-	bool32_t result = false;
-	
-	NSString* path = [[NSBundle mainBundle] pathForResource:[NSString stringWithUTF8String:file] ofType:[NSString stringWithUTF8String:fileType]];
-	NSString* content = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil];
-	if( content.length < memory->size )
-	{
-		memcpy( memory->pointer, [content UTF8String], content.length );
-		((char*)memory->pointer)[content.length] = 0; // null terminate string
-		result = true;
-	}
-	
-	return result;
+    bool32_t result = false;
+    
+    NSString* path = [[NSBundle mainBundle] pathForResource:[NSString stringWithUTF8String:file] ofType:[NSString stringWithUTF8String:fileType]];
+    NSString* content = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil];
+    if( content.length < memory->size )
+    {
+        memcpy( memory->pointer, [content UTF8String], content.length );
+        ((char*)memory->pointer)[content.length] = 0; // null terminate string
+        result = true;
+    }
+    
+    return result;
 }
 #endif
 
@@ -83,27 +83,27 @@ bool32_t LoadTexture( struct Texture* texture, const char* file )
 #else
 bool32_t LoadTexture( struct Texture* texture, const char* file )
 {
-	bool32_t result = false;
-	
-	NSString* texturePath = [[NSBundle mainBundle] pathForResource:[NSString stringWithUTF8String:file] ofType:@"png"];
-	NSError* theError;
-	GLKTextureInfo* info = [GLKTextureLoader textureWithContentsOfFile:texturePath options:nil error:&theError];
-	
-	texture->id = info.name;
-	texture->width = info.width;
-	texture->height = info.height;
-	
-	return result;
+    bool32_t result = false;
+    
+    NSString* texturePath = [[NSBundle mainBundle] pathForResource:[NSString stringWithUTF8String:file] ofType:@"png"];
+    NSError* theError;
+    GLKTextureInfo* info = [GLKTextureLoader textureWithContentsOfFile:texturePath options:nil error:&theError];
+    
+    texture->id = info.name;
+    texture->width = info.width;
+    texture->height = info.height;
+    
+    return result;
 }
 #endif
 
 void UnloadTexture( struct Texture* texture )
 {
-	if( texture->id > 0 )
-		glDeleteTextures( 1, &texture->id );
-	
-	texture->id = 0;
-	texture->width = texture->height = 0;
+    if( texture->id > 0 )
+        glDeleteTextures( 1, &texture->id );
+    
+    texture->id = 0;
+    texture->width = texture->height = 0;
 }
 
 bool32_t CreateShader( struct Shader* shader )
@@ -145,7 +145,7 @@ bool32_t MemShader( struct Shader* shader, const char* source, GLenum type )
 
 bool32_t LoadShader( struct Shader* shader, struct Memory* memory, const char* file, GLenum type )
 {
-	const char* fileType = ( type == GL_VERTEX_SHADER ? "vs" : "fs" );
+    const char* fileType = ( type == GL_VERTEX_SHADER ? "vs" : "fs" );
     if( ReadFile( file, fileType, memory ) )
         return MemShader( shader, (const char*)memory->pointer, type );
     return false;
@@ -291,32 +291,32 @@ void RenderTile( struct Shader* shader, struct Mesh* mesh, uint8_t id, v2 positi
 #else
 void RenderTile( struct Shader* shader, struct Mesh* mesh, uint8_t id, GLKVector2 position )
 {
-	if( id > 0 )
-	{
-		v2 tileOffset = GetTileOffset( id );
-		
-		m4 modelMatrix = GLKMatrix4Multiply( GLKMatrix4MakeTranslation( position.x, position.y, 0.0f), GLKMatrix4MakeScale( TILE_SIZE, TILE_SIZE, 1.0f ) );
-		glUniformMatrix4fv( shader->uniforms[MODEL_MATRIX], 1, GL_FALSE, modelMatrix.m );
-		glUniform2f( shader->uniforms[UV_OFFSET], tileOffset.x, tileOffset.y );
-		glUniform1f( shader->uniforms[UV_LENGTH], TILE_UV_LENGTH );
-		
-		RenderMesh( mesh );
-	}
+    if( id > 0 )
+    {
+        v2 tileOffset = GetTileOffset( id );
+        
+        m4 modelMatrix = GLKMatrix4Multiply( GLKMatrix4MakeTranslation( position.x, position.y, 0.0f), GLKMatrix4MakeScale( TILE_SIZE, TILE_SIZE, 1.0f ) );
+        glUniformMatrix4fv( shader->uniforms[MODEL_MATRIX], 1, GL_FALSE, modelMatrix.m );
+        glUniform2f( shader->uniforms[UV_OFFSET], tileOffset.x, tileOffset.y );
+        glUniform1f( shader->uniforms[UV_LENGTH], TILE_UV_LENGTH );
+        
+        RenderMesh( mesh );
+    }
 }
 #endif*/
 void RenderTile( struct Shader* shader, struct Mesh* mesh, uint8_t id, v2 position )
 {
-	if( id > 0 )
-	{
-		v2 tileOffset = GetTileOffset( id );
-		
-		m4 modelMatrix = MATRIX_MULTIPLY( MATRIX_TRANSLATION( position.x, position.y, 0.0f ), MATRIX_SCALE( TILE_SIZE, TILE_SIZE, 1.0f ) );
-		glUniformMatrix4fv( shader->uniforms[MODEL_MATRIX], 1, GL_FALSE, MATRIX_VALUE(modelMatrix) );
-		glUniform2f( shader->uniforms[UV_OFFSET], tileOffset.x, tileOffset.y );
-		glUniform1f( shader->uniforms[UV_LENGTH], TILE_UV_LENGTH );
-		
-		RenderMesh( mesh );
-	}
+    if( id > 0 )
+    {
+        v2 tileOffset = GetTileOffset( id );
+        
+        m4 modelMatrix = MATRIX_MULTIPLY( MATRIX_TRANSLATION( position.x, position.y, 0.0f ), MATRIX_SCALE( TILE_SIZE, TILE_SIZE, 1.0f ) );
+        glUniformMatrix4fv( shader->uniforms[MODEL_MATRIX], 1, GL_FALSE, MATRIX_VALUE(modelMatrix) );
+        glUniform2f( shader->uniforms[UV_OFFSET], tileOffset.x, tileOffset.y );
+        glUniform1f( shader->uniforms[UV_LENGTH], TILE_UV_LENGTH );
+        
+        RenderMesh( mesh );
+    }
 }
 
 bool32_t CreateCamera( struct Camera* camera )
@@ -332,19 +332,19 @@ bool32_t CreateCamera( struct Camera* camera )
     camera->projection = GLKMatrix4MakeOrtho( 0.0f, bounds.size.width, bounds.size.height, 0.0f, -1.0f, 1.0f );
     camera->view = GLKMatrix4Identity;
 #endif*/
-	
-	v2 bounds;
+    
+    v2 bounds;
 #ifdef _WIN32
-	bounds.x = WINDOW_WIDTH;
-	bounds.y = WINDOW_HEIGHT;
+    bounds.x = WINDOW_W;
+    bounds.y = WINDOW_H;
 #else
-	CGRect br = [[UIScreen mainScreen] bounds];
-	bounds.x = br.size.width;
-	bounds.y = br.size.height;
+    CGRect br = [[UIScreen mainScreen] bounds];
+    bounds.x = br.size.width;
+    bounds.y = br.size.height;
 #endif
-	
-	camera->projection = MATRIX_ORTHO( bounds.x, bounds.y );
-	camera->view = MATRIX_IDENTITY;
+    
+    camera->projection = MATRIX_ORTHO( bounds.x, bounds.y );
+    camera->view = MATRIX_IDENTITY;
 
     return true;
 }
@@ -376,12 +376,12 @@ bool32_t GameInit( struct Memory* memory )
     if( !BufferMesh( &g->quadMesh, quadVertices, 4, quadIndices, 6 ) )
         result = false;
 
-	if( !CreateShader( &g->shader ) )
-		result = false;
-	if( !LoadShader( &g->shader, &g->memory, "diffuse", GL_VERTEX_SHADER ) )
-		result = false;
-	if( !LoadShader( &g->shader, &g->memory, "diffuse", GL_FRAGMENT_SHADER ) )
-		result = false;
+    if( !CreateShader( &g->shader ) )
+        result = false;
+    if( !LoadShader( &g->shader, &g->memory, DIFFUSE_VS_PATH, GL_VERTEX_SHADER ) )
+        result = false;
+    if( !LoadShader( &g->shader, &g->memory, DIFFUSE_FS_PATH, GL_FRAGMENT_SHADER ) )
+        result = false;
     if( !LinkShader( &g->shader ) )
         result = false;
     AddUniform( &g->shader, "ProjectionMatrix" );
@@ -393,8 +393,8 @@ bool32_t GameInit( struct Memory* memory )
     if( !CreateCamera( &g->camera ) )
         result = false;
 
-	if( !LoadTexture( &g->texture, "tilesheet" ) )
-		result = false;
+    if( !LoadTexture( &g->texture, TILESHEET_PATH ) )
+        result = false;
 
     for( int y=0; y<GAME_MAP_HEIGHT; y++ )
     {
@@ -421,7 +421,7 @@ void GameRender( struct Memory* memory )
 
     glUseProgram( g->shader.program );
     glBindTexture( GL_TEXTURE_2D, g->texture.id );
-	
+    
 /*#ifdef _WIN32
     glUniformMatrix4fv( g->shader.uniforms[PROJECTION_MATRIX], 1, GL_FALSE, value_ptr( g->camera.projection ) );
     glUniformMatrix4fv( g->shader.uniforms[VIEW_MATRIX], 1, GL_FALSE, value_ptr( g->camera.view ) );
@@ -437,19 +437,19 @@ void GameRender( struct Memory* memory )
 #ifdef _WIN32
             RenderTile( &g->shader, &g->quadMesh, g->map[y][x], v2( x*TILE_SIZE, y*TILE_SIZE ) );
 #else
-			RenderTile( &g->shader, &g->quadMesh, g->map[y][x], GLKVector2Make( x*TILE_SIZE, y*TILE_SIZE ) );
+            RenderTile( &g->shader, &g->quadMesh, g->map[y][x], GLKVector2Make( x*TILE_SIZE, y*TILE_SIZE ) );
 #endif
         }
     }*/
-	
-	glUniformMatrix4fv( g->shader.uniforms[PROJECTION_MATRIX], 1, GL_FALSE, MATRIX_VALUE( g->camera.projection ) );
-	glUniformMatrix4fv( g->shader.uniforms[VIEW_MATRIX], 1, GL_FALSE, MATRIX_VALUE( g->camera.view ) );
-	
-	for( int y=0; y<GAME_MAP_HEIGHT; y++ )
-	{
-		for( int x=0; x<GAME_MAP_WIDTH; x++ )
-		{
-			RenderTile( &g->shader, &g->quadMesh, g->map[y][x], MAKE_V2( x*TILE_SIZE, y*TILE_SIZE ) );
-		}
-	}
+    
+    glUniformMatrix4fv( g->shader.uniforms[PROJECTION_MATRIX], 1, GL_FALSE, MATRIX_VALUE( g->camera.projection ) );
+    glUniformMatrix4fv( g->shader.uniforms[VIEW_MATRIX], 1, GL_FALSE, MATRIX_VALUE( g->camera.view ) );
+    
+    for( int y=0; y<GAME_MAP_HEIGHT; y++ )
+    {
+        for( int x=0; x<GAME_MAP_WIDTH; x++ )
+        {
+            RenderTile( &g->shader, &g->quadMesh, g->map[y][x], MAKE_V2( x*TILE_SIZE, y*TILE_SIZE ) );
+        }
+    }
 }
