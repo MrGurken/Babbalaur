@@ -9,7 +9,7 @@
 #include "babbalaur.h"
 
 #ifdef _WIN32
-bool32_t ReadFile( const char* file, struct Memory* memory )
+bool32_t ReadFile( const char* file, const char* fileType, struct Memory* memory )
 {
     bool32_t result = false;
 
@@ -33,29 +33,31 @@ bool32_t ReadFile( const char* file, struct Memory* memory )
     return result;
 }
 #else
-bool32_t ReadFile( const char* file, struct Memory* memory )
+bool32_t ReadFile( const char* file, const char* fileType, struct Memory* memory )
 {
-    bool32_t result = false;
-    
-    NSString* str = [NSString stringWithContentsOfFile:[NSString stringWithUTF8String:file] encoding:NSUTF8StringEncoding error:nil];
-    if( str.length < memory->size )
-    {
-        memcpy( memory->pointer, [str UTF8String], str.length );
-        result = true;
-    }
-    
-    return result;
+	bool32_t result = false;
+	
+	NSString* path = [[NSBundle mainBundle] pathForResource:[NSString stringWithUTF8String:file] ofType:[NSString stringWithUTF8String:fileType]];
+	NSString* content = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil];
+	if( content.length < memory->size )
+	{
+		memcpy( memory->pointer, [content UTF8String], content.length );
+		((char*)memory->pointer)[content.length] = 0; // null terminate string
+		result = true;
+	}
+	
+	return result;
 }
 #endif
 
-void MemTexture( Texture* texture, int width, int height, void* pixels, GLenum format )
+void MemTexture( struct Texture* texture, int width, int height, void* pixels, GLenum format )
 {
     glGenTextures( 1, &texture->id );
     glBindTexture( GL_TEXTURE_2D, texture->id );
     glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
     glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
-    //glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
-    //glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
     glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, format, GL_UNSIGNED_BYTE, pixels );
 
     texture->width = width;
@@ -63,7 +65,7 @@ void MemTexture( Texture* texture, int width, int height, void* pixels, GLenum f
 }
 
 #ifdef _WIN32
-bool32_t LoadTexture( Texture* texture, const char* file )
+bool32_t LoadTexture( struct Texture* texture, const char* file )
 {
     bool32_t result = false;
 
@@ -79,7 +81,30 @@ bool32_t LoadTexture( Texture* texture, const char* file )
     return result;
 }
 #else
+bool32_t LoadTexture( struct Texture* texture, const char* file )
+{
+	bool32_t result = false;
+	
+	NSString* texturePath = [[NSBundle mainBundle] pathForResource:[NSString stringWithUTF8String:file] ofType:@"png"];
+	NSError* theError;
+	GLKTextureInfo* info = [GLKTextureLoader textureWithContentsOfFile:texturePath options:nil error:&theError];
+	
+	texture->id = info.name;
+	texture->width = info.width;
+	texture->height = info.height;
+	
+	return result;
+}
 #endif
+
+void UnloadTexture( struct Texture* texture )
+{
+	if( texture->id > 0 )
+		glDeleteTextures( 1, &texture->id );
+	
+	texture->id = 0;
+	texture->width = texture->height = 0;
+}
 
 bool32_t CreateShader( struct Shader* shader )
 {
@@ -120,7 +145,8 @@ bool32_t MemShader( struct Shader* shader, const char* source, GLenum type )
 
 bool32_t LoadShader( struct Shader* shader, struct Memory* memory, const char* file, GLenum type )
 {
-    if( ReadFile( file, memory ) )
+	const char* fileType = ( type == GL_VERTEX_SHADER ? "vs" : "fs" );
+    if( ReadFile( file, fileType, memory ) )
         return MemShader( shader, (const char*)memory->pointer, type );
     return false;
 }
@@ -231,25 +257,6 @@ void RenderMesh( struct Mesh* mesh )
     glDrawElements( GL_TRIANGLES, mesh->size, GL_UNSIGNED_INT, 0 );
 }
 
-bool32_t CreateQuad( struct Quad* quad )
-{
-    quad->position.x = quad->position.y = quad->position.z = 0.0f;
-    quad->scale.x = quad->scale.y = quad->scale.z = 1.0f;
-
-    return true;
-}
-
-void RenderQuad( struct Quad* quad, struct Shader* shader, struct Mesh* mesh )
-{
-#ifdef _WIN32
-    m4 modelMatrix = glm::scale( glm::translate( m4(), quad->position ), quad->scale );
-    glUniformMatrix4fv( shader->uniforms[MODEL_MATRIX], 1, GL_FALSE, value_ptr(modelMatrix) );
-#else
-#endif
-
-    RenderMesh( mesh );
-}
-
 v2 GetTileOffset( uint8_t id )
 {
     v2 result;
@@ -257,13 +264,13 @@ v2 GetTileOffset( uint8_t id )
     int x = (id-1) % TILESHEET_WIDTH;
     int y = (id-1) / TILESHEET_WIDTH;
 
-    result.x = x;
-    result.y = y;
-    result *= TILE_UV_LENGTH;
+    result.x = x * TILE_UV_LENGTH;
+    result.y = y * TILE_UV_LENGTH;
 
     return result;
 }
 
+/*#ifdef _WIN32
 void RenderTile( struct Shader* shader, struct Mesh* mesh, uint8_t id, v2 position )
 {
     if( id > 0 )
@@ -281,12 +288,42 @@ void RenderTile( struct Shader* shader, struct Mesh* mesh, uint8_t id, v2 positi
         RenderMesh( mesh );
     }
 }
+#else
+void RenderTile( struct Shader* shader, struct Mesh* mesh, uint8_t id, GLKVector2 position )
+{
+	if( id > 0 )
+	{
+		v2 tileOffset = GetTileOffset( id );
+		
+		m4 modelMatrix = GLKMatrix4Multiply( GLKMatrix4MakeTranslation( position.x, position.y, 0.0f), GLKMatrix4MakeScale( TILE_SIZE, TILE_SIZE, 1.0f ) );
+		glUniformMatrix4fv( shader->uniforms[MODEL_MATRIX], 1, GL_FALSE, modelMatrix.m );
+		glUniform2f( shader->uniforms[UV_OFFSET], tileOffset.x, tileOffset.y );
+		glUniform1f( shader->uniforms[UV_LENGTH], TILE_UV_LENGTH );
+		
+		RenderMesh( mesh );
+	}
+}
+#endif*/
+void RenderTile( struct Shader* shader, struct Mesh* mesh, uint8_t id, v2 position )
+{
+	if( id > 0 )
+	{
+		v2 tileOffset = GetTileOffset( id );
+		
+		m4 modelMatrix = MATRIX_MULTIPLY( MATRIX_TRANSLATION( position.x, position.y, 0.0f ), MATRIX_SCALE( TILE_SIZE, TILE_SIZE, 1.0f ) );
+		glUniformMatrix4fv( shader->uniforms[MODEL_MATRIX], 1, GL_FALSE, MATRIX_VALUE(modelMatrix) );
+		glUniform2f( shader->uniforms[UV_OFFSET], tileOffset.x, tileOffset.y );
+		glUniform1f( shader->uniforms[UV_LENGTH], TILE_UV_LENGTH );
+		
+		RenderMesh( mesh );
+	}
+}
 
 bool32_t CreateCamera( struct Camera* camera )
 {
     camera->position.x = camera->position.y = camera->position.z = 0.0f;
 
-#ifdef _WIN32
+/*#ifdef _WIN32
     camera->projection = glm::ortho( 0.0f, (real32_t)WINDOW_W, (real32_t)WINDOW_H, 0.0f, -1.0f, 1.0f );
     camera->view = m4();
 #else
@@ -294,7 +331,20 @@ bool32_t CreateCamera( struct Camera* camera )
     CGRect bounds = [[UIScreen mainScreen] bounds];
     camera->projection = GLKMatrix4MakeOrtho( 0.0f, bounds.size.width, bounds.size.height, 0.0f, -1.0f, 1.0f );
     camera->view = GLKMatrix4Identity;
+#endif*/
+	
+	v2 bounds;
+#ifdef _WIN32
+	bounds.x = WINDOW_WIDTH;
+	bounds.y = WINDOW_HEIGHT;
+#else
+	CGRect br = [[UIScreen mainScreen] bounds];
+	bounds.x = br.size.width;
+	bounds.y = br.size.height;
 #endif
+	
+	camera->projection = MATRIX_ORTHO( bounds.x, bounds.y );
+	camera->view = MATRIX_IDENTITY;
 
     return true;
 }
@@ -326,40 +376,12 @@ bool32_t GameInit( struct Memory* memory )
     if( !BufferMesh( &g->quadMesh, quadVertices, 4, quadIndices, 6 ) )
         result = false;
 
-    /*const char* vsource = "attribute vec3 PositionIn;"
-      "attribute vec2 UVIn;"
-      "varying vec2 UV0;"
-      "uniform mat4 ProjectionMatrix;"
-      "uniform mat4 ViewMatrix;"
-      "uniform mat4 ModelMatrix;"
-      "void main() { UV0 = UVIn; gl_Position = ProjectionMatrix * ViewMatrix * ModelMatrix * vec4( PositionIn, 1.0 ); }";
-      const char* fsource = "varying vec2 UV0;"
-      "uniform sampler2D DiffuseMap;"
-      "void main() { gl_FragColor = texture2D( DiffuseMap, UV0 ); }";
-
-      if( !CreateShader( &g->shader ) )
-      result = false;
-      if( !MemShader( &g->shader, vsource, GL_VERTEX_SHADER ) )
-      result = false;
-      if( !MemShader( &g->shader, fsource, GL_FRAGMENT_SHADER ) )
-      result = false;
-      if( !LinkShader( &g->shader ) )
-      result = false;
-      if( !AddUniform( &g->shader, "ProjectionMatrix" ) )
-      result = false;
-      if( !AddUniform( &g->shader, "ViewMatrix" ) )
-      result = false;
-      if( !AddUniform( &g->shader, "ModelMatrix" ) )
-      result = false;
-      if( !AddUniform( &g->shader, "DiffuseMap" ) )
-      result = false;*/
-
-    if( !CreateShader( &g->shader ) )
-        result = false;
-    if( !LoadShader( &g->shader, &g->memory, "./shaders/diffuse.vs", GL_VERTEX_SHADER ) )
-        result = false;
-    if( !LoadShader( &g->shader, &g->memory, "./shaders/diffuse.fs", GL_FRAGMENT_SHADER ) )
-        result = false;
+	if( !CreateShader( &g->shader ) )
+		result = false;
+	if( !LoadShader( &g->shader, &g->memory, "diffuse", GL_VERTEX_SHADER ) )
+		result = false;
+	if( !LoadShader( &g->shader, &g->memory, "diffuse", GL_FRAGMENT_SHADER ) )
+		result = false;
     if( !LinkShader( &g->shader ) )
         result = false;
     AddUniform( &g->shader, "ProjectionMatrix" );
@@ -371,8 +393,8 @@ bool32_t GameInit( struct Memory* memory )
     if( !CreateCamera( &g->camera ) )
         result = false;
 
-    if( !LoadTexture( &g->texture, "./textures/tilesheet.png" ) )
-        result = false;
+	if( !LoadTexture( &g->texture, "tilesheet" ) )
+		result = false;
 
     for( int y=0; y<GAME_MAP_HEIGHT; y++ )
     {
@@ -394,13 +416,13 @@ void GameRender( struct Memory* memory )
 {
     struct Gamestate* g = (struct Gamestate*)memory->pointer;
     
-    glClearColor( 0.0f, 0.0f, 0.0f, 0.0f );
+    glClearColor( 1.0f, 0.0f, 0.0f, 0.0f );
     glClear( GL_COLOR_BUFFER_BIT );
 
     glUseProgram( g->shader.program );
     glBindTexture( GL_TEXTURE_2D, g->texture.id );
-    
-#ifdef _WIN32
+	
+/*#ifdef _WIN32
     glUniformMatrix4fv( g->shader.uniforms[PROJECTION_MATRIX], 1, GL_FALSE, value_ptr( g->camera.projection ) );
     glUniformMatrix4fv( g->shader.uniforms[VIEW_MATRIX], 1, GL_FALSE, value_ptr( g->camera.view ) );
 #else
@@ -412,7 +434,22 @@ void GameRender( struct Memory* memory )
     {
         for( int x=0; x<GAME_MAP_WIDTH; x++ )
         {
+#ifdef _WIN32
             RenderTile( &g->shader, &g->quadMesh, g->map[y][x], v2( x*TILE_SIZE, y*TILE_SIZE ) );
+#else
+			RenderTile( &g->shader, &g->quadMesh, g->map[y][x], GLKVector2Make( x*TILE_SIZE, y*TILE_SIZE ) );
+#endif
         }
-    }
+    }*/
+	
+	glUniformMatrix4fv( g->shader.uniforms[PROJECTION_MATRIX], 1, GL_FALSE, MATRIX_VALUE( g->camera.projection ) );
+	glUniformMatrix4fv( g->shader.uniforms[VIEW_MATRIX], 1, GL_FALSE, MATRIX_VALUE( g->camera.view ) );
+	
+	for( int y=0; y<GAME_MAP_HEIGHT; y++ )
+	{
+		for( int x=0; x<GAME_MAP_WIDTH; x++ )
+		{
+			RenderTile( &g->shader, &g->quadMesh, g->map[y][x], MAKE_V2( x*TILE_SIZE, y*TILE_SIZE ) );
+		}
+	}
 }

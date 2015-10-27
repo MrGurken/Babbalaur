@@ -31,8 +31,10 @@
 #define MEGABYTES(n) (1024*KILOBYTES(n))
 #define GIGABYTES(n) (1024*MEGABYTES(n))
 
+#ifndef MIN
 #define MIN(a,b) (a<b?a:b)
 #define MAX(a,b) (a>b?a:b)
+#endif
 
 typedef int32_t bool32_t;
 typedef float real32_t;
@@ -96,12 +98,6 @@ struct Camera
     v3 position;
     m4 projection;
     m4 view;
-};
-
-struct Quad
-{
-    v3 position;
-    v3 scale;
 };
 
 #define TILESHEET_WIDTH 10
