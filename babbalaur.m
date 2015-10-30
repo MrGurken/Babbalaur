@@ -8,59 +8,56 @@
 
 #include "babbalaur.h"
 
-#ifdef _WIN32
-bool32_t ButtonDown( struct Input* input, int index )
+bool32_t ButtonDown( Input* input, int index )
 {
     return input->buttons[index];
 }
 
-bool32_t ButtonUp( struct Input* input, int index )
+bool32_t ButtonUp( Input* input, int index )
 {
     return !input->buttons[index];
 }
 
-bool32_t ButtonPressed( struct Input* newInput, struct Input* oldInput, int index )
+bool32_t ButtonPressed( Input* newInput, Input* oldInput, int index )
 {
     if( ButtonUp( newInput, index ) )
         return false;
     return ButtonUp( oldInput, index );
 }
 
-bool32_t ButtonReleased( struct Input* newInput, struct Input* oldInput, int index )
+bool32_t ButtonReleased( Input* newInput, Input* oldInput, int index )
 {
     if( ButtonDown( newInput, index ) )
         return false;
     return ButtonDown( oldInput, index );
 }
 
-bool32_t KeyDown( struct Input* input, int index )
+bool32_t KeyDown( Input* input, int index )
 {
     return input->keys[index];
 }
 
-bool32_t KeyUp( struct Input* input, int index )
+bool32_t KeyUp( Input* input, int index )
 {
     return !input->keys[index];
 }
 
-bool32_t KeyPressed( struct Input* newInput, struct Input* oldInput, int index )
+bool32_t KeyPressed( Input* newInput, Input* oldInput, int index )
 {
     if( KeyUp( newInput, index ) )
         return false;
     return KeyUp( oldInput, index );
 }
 
-bool32_t KeyReleased( struct Input* newInput, struct Input* oldInput, int index )
+bool32_t KeyReleased( Input* newInput, Input* oldInput, int index )
 {
     if( KeyDown( newInput, index ) )
         return false;
     return KeyDown( oldInput, index );
 }
-#else
-#endif
 
 #ifdef _WIN32
-bool32_t ReadFile( const char* file, const char* fileType, struct Memory* memory )
+bool32_t ReadFile( const char* file, const char* fileType, Memory* memory )
 {
     bool32_t result = false;
     
@@ -84,7 +81,7 @@ bool32_t ReadFile( const char* file, const char* fileType, struct Memory* memory
     return result;
 }
 #else
-bool32_t ReadFile( const char* file, const char* fileType, struct Memory* memory )
+bool32_t ReadFile( const char* file, const char* fileType, Memory* memory )
 {
     bool32_t result = false;
     
@@ -101,7 +98,7 @@ bool32_t ReadFile( const char* file, const char* fileType, struct Memory* memory
 }
 #endif
 
-void MemTexture( struct Texture* texture, int width, int height, void* pixels, GLenum format )
+void MemTexture( Texture* texture, int width, int height, void* pixels, GLenum format )
 {
     glGenTextures( 1, &texture->id );
     glBindTexture( GL_TEXTURE_2D, texture->id );
@@ -116,7 +113,7 @@ void MemTexture( struct Texture* texture, int width, int height, void* pixels, G
 }
 
 #ifdef _WIN32
-bool32_t LoadTexture( struct Texture* texture, const char* file )
+bool32_t LoadTexture( Texture* texture, const char* file )
 {
     bool32_t result = false;
 
@@ -132,7 +129,7 @@ bool32_t LoadTexture( struct Texture* texture, const char* file )
     return result;
 }
 #else
-bool32_t LoadTexture( struct Texture* texture, const char* file )
+bool32_t LoadTexture( Texture* texture, const char* file )
 {
     bool32_t result = false;
     
@@ -148,7 +145,7 @@ bool32_t LoadTexture( struct Texture* texture, const char* file )
 }
 #endif
 
-void UnloadTexture( struct Texture* texture )
+void UnloadTexture( Texture* texture )
 {
     if( texture->id > 0 )
         glDeleteTextures( 1, &texture->id );
@@ -157,7 +154,7 @@ void UnloadTexture( struct Texture* texture )
     texture->width = texture->height = 0;
 }
 
-bool32_t CreateShader( struct Shader* shader )
+bool32_t CreateShader( Shader* shader )
 {
     shader->program = glCreateProgram();
     shader->nuniforms = 0;
@@ -165,7 +162,7 @@ bool32_t CreateShader( struct Shader* shader )
     return true;
 }
 
-bool32_t MemShader( struct Shader* shader, const char* source, GLenum type )
+bool32_t MemShader( Shader* shader, const char* source, GLenum type )
 {
     bool32_t result = true;
     
@@ -194,7 +191,7 @@ bool32_t MemShader( struct Shader* shader, const char* source, GLenum type )
     return result;
 }
 
-bool32_t LoadShader( struct Shader* shader, struct Memory* memory, const char* file, GLenum type )
+bool32_t LoadShader( Shader* shader, Memory* memory, const char* file, GLenum type )
 {
     const char* fileType = ( type == GL_VERTEX_SHADER ? "vs" : "fs" );
     if( ReadFile( file, fileType, memory ) )
@@ -202,7 +199,7 @@ bool32_t LoadShader( struct Shader* shader, struct Memory* memory, const char* f
     return false;
 }
 
-bool32_t LinkShader( struct Shader* shader )
+bool32_t LinkShader( Shader* shader )
 {
     bool32_t result = true;
     glLinkProgram( shader->program );
@@ -223,7 +220,7 @@ bool32_t LinkShader( struct Shader* shader )
     return result;
 }
 
-bool32_t AddUniform( struct Shader* shader, const char* uniform )
+bool32_t AddUniform( Shader* shader, const char* uniform )
 {
     bool32_t result = false;
     
@@ -234,7 +231,7 @@ bool32_t AddUniform( struct Shader* shader, const char* uniform )
     return result;
 }
 
-bool32_t CreateMesh( struct Mesh* mesh )
+bool32_t CreateMesh( Mesh* mesh )
 {
 #ifdef _WIN32
     glGenVertexArrays( 1, &mesh->vao );
@@ -253,8 +250,8 @@ bool32_t CreateMesh( struct Mesh* mesh )
     glEnableVertexAttribArray( 0 );
     glEnableVertexAttribArray( 1 );
 
-    glVertexAttribPointer( 0, 3, GL_FLOAT, GL_FALSE, sizeof(struct Vertex), 0 );
-    glVertexAttribPointer( 1, 2, GL_FLOAT, GL_FALSE, sizeof(struct Vertex), (void*)(sizeof(GLfloat)*3) );
+    glVertexAttribPointer( 0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0 );
+    glVertexAttribPointer( 1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(GLfloat)*3) );
 
     glBindBuffer( GL_ARRAY_BUFFER, 0 );
     glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
@@ -268,7 +265,7 @@ bool32_t CreateMesh( struct Mesh* mesh )
     return true;
 }
 
-bool32_t BufferMesh( struct Mesh* mesh, struct Vertex* v, int nv, GLuint* i, int ni )
+bool32_t BufferMesh( Mesh* mesh, Vertex* v, int nv, GLuint* i, int ni )
 {
 #ifdef _WIN32
     glBindVertexArray( mesh->vao );
@@ -277,7 +274,7 @@ bool32_t BufferMesh( struct Mesh* mesh, struct Vertex* v, int nv, GLuint* i, int
 #endif
     
     glBindBuffer( GL_ARRAY_BUFFER, mesh->vbo );
-    glBufferData( GL_ARRAY_BUFFER, sizeof(struct Vertex)*nv, v, GL_STATIC_DRAW );
+    glBufferData( GL_ARRAY_BUFFER, sizeof(Vertex)*nv, v, GL_STATIC_DRAW );
 
     glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, mesh->ibo );
     glBufferData( GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint)*ni, i, GL_STATIC_DRAW );
@@ -296,7 +293,7 @@ bool32_t BufferMesh( struct Mesh* mesh, struct Vertex* v, int nv, GLuint* i, int
     return true;
 }
 
-void RenderMesh( struct Mesh* mesh )
+void RenderMesh( Mesh* mesh )
 {
 #ifdef _WIN32
     glBindVertexArray( mesh->vao );
@@ -321,41 +318,7 @@ v2 GetTileOffset( uint8_t id )
     return result;
 }
 
-/*#ifdef _WIN32
-void RenderTile( struct Shader* shader, struct Mesh* mesh, uint8_t id, v2 position )
-{
-    if( id > 0 )
-    {
-        v2 tileOffset = GetTileOffset( id );
-
-        v3 pos( position.x, position.y, 0.0f );
-        v3 scale( TILE_SIZE, TILE_SIZE, 1.0f );
-    
-        m4 modelMatrix = glm::scale( glm::translate( m4(), pos ), scale );
-        glUniformMatrix4fv( shader->uniforms[MODEL_MATRIX], 1, GL_FALSE, value_ptr( modelMatrix ) );
-        glUniform2f( shader->uniforms[UV_OFFSET], tileOffset.x, tileOffset.y );
-        glUniform1f( shader->uniforms[UV_LENGTH], TILE_UV_LENGTH );
-
-        RenderMesh( mesh );
-    }
-}
-#else
-void RenderTile( struct Shader* shader, struct Mesh* mesh, uint8_t id, GLKVector2 position )
-{
-    if( id > 0 )
-    {
-        v2 tileOffset = GetTileOffset( id );
-        
-        m4 modelMatrix = GLKMatrix4Multiply( GLKMatrix4MakeTranslation( position.x, position.y, 0.0f), GLKMatrix4MakeScale( TILE_SIZE, TILE_SIZE, 1.0f ) );
-        glUniformMatrix4fv( shader->uniforms[MODEL_MATRIX], 1, GL_FALSE, modelMatrix.m );
-        glUniform2f( shader->uniforms[UV_OFFSET], tileOffset.x, tileOffset.y );
-        glUniform1f( shader->uniforms[UV_LENGTH], TILE_UV_LENGTH );
-        
-        RenderMesh( mesh );
-    }
-}
-#endif*/
-void RenderTile( struct Shader* shader, struct Mesh* mesh, uint8_t id, v2 position )
+void RenderTile( Shader* shader, Mesh* mesh, uint8_t id, v2 position )
 {
     if( id > 0 )
     {
@@ -370,20 +333,10 @@ void RenderTile( struct Shader* shader, struct Mesh* mesh, uint8_t id, v2 positi
     }
 }
 
-bool32_t CreateCamera( struct Camera* camera )
+bool32_t CreateCamera( Camera* camera )
 {
     camera->position.x = camera->position.y = camera->position.z = 0.0f;
 
-/*#ifdef _WIN32
-    camera->projection = glm::ortho( 0.0f, (real32_t)WINDOW_W, (real32_t)WINDOW_H, 0.0f, -1.0f, 1.0f );
-    camera->view = m4();
-#else
-    //camera->projection = GLKMatrix4MakeOrtho( 0.0f, (real32_t)WINDOW_W, (real32_t)WINDOW_H, 0.0f, -1.0f, 1.0f );
-    CGRect bounds = [[UIScreen mainScreen] bounds];
-    camera->projection = GLKMatrix4MakeOrtho( 0.0f, bounds.size.width, bounds.size.height, 0.0f, -1.0f, 1.0f );
-    camera->view = GLKMatrix4Identity;
-#endif*/
-    
     v2 bounds;
 #ifdef _WIN32
     bounds.x = WINDOW_W;
@@ -400,7 +353,7 @@ bool32_t CreateCamera( struct Camera* camera )
     return true;
 }
 
-uint8_t GetTileID( uint8_t* map, int x, int y, int pitch = GAME_MAP_WIDTH )
+uint8_t GetTileID( uint8_t* map, int x, int y, int pitch )
 {
     return map[y*pitch+x];
 }
@@ -410,20 +363,20 @@ v2 ScreenToWorld( v3 world, v2 screen )
     return MAKE_v2( screen.x+world.x, screen.y+world.y );
 }
 
-v2 ScreenToWorld( v2 world, v2 screen )
+/*v2 ScreenToWorld( v2 world, v2 screen )
 {
     return MAKE_v2( screen.x+world.x, screen.y+world.y );
-}
+}*/
 
 v2 WorldToScreen( v3 world, v2 screen )
 {
     return MAKE_v2( screen.x+world.x, screen.y+world.y );
 }
 
-v2 WorldToScreen( v2 world, v2 screen )
+/*v2 WorldToScreen( v2 world, v2 screen )
 {
     return MAKE_v2( screen.x+world.x, screen.y+world.y );
-}
+}*/
 
 p2 WorldToGrid( v2 world )
 {
@@ -433,28 +386,27 @@ p2 WorldToGrid( v2 world )
     return gridPoint;
 }
 
-Machine* GetMachine( struct Machine* machines, int x, int y, int pitch = GAME_MAP_WIDTH )
+Machine* GetMachine( Machine* machines, int x, int y )
 {
-    return &machines[y*pitch+x];
+    return &machines[y*GAME_MAP_WIDTH+x];
 }
 
-Machine* GridToMachine( struct Machine* machines, p2 gridPoint,
-                        int w = GAME_MAP_WIDTH, int h = GAME_MAP_HEIGHT )
+Machine* GridToMachine( Machine* machines, p2 gridPoint )
 {
-    Machine* result = 0;
+	Machine* result = 0;
 
-    if( gridPoint.x >= 0 && gridPoint.x < w &&
-        gridPoint.y >= 0 && gridPoint.y < h )
+    if( gridPoint.x >= 0 && gridPoint.x < GAME_MAP_WIDTH &&
+        gridPoint.y >= 0 && gridPoint.y < GAME_MAP_HEIGHT )
     {
-        result = GetMachine( machines, gridPoint.x, gridPoint.y, w );
+        result = GetMachine( machines, gridPoint.x, gridPoint.y );
     }
     
     return result;
 }
 
-bool32_t GetAdjacentMachines( struct Machine* machines,
+bool32_t GetAdjacentMachines( Machine* machines,
                               p2 gridPoint,
-                              struct Machine** buffer )
+							  Machine** buffer )
 {
     bool32_t result = false;
 
@@ -467,7 +419,7 @@ bool32_t GetAdjacentMachines( struct Machine* machines,
                 continue;
             
             p2 index = { x, y };
-            Machine* ptr = GridToMachine( machines, index );
+			Machine* ptr = GridToMachine( machines, index );
 
             if( ptr && ptr->alive )
             {
@@ -482,9 +434,9 @@ bool32_t GetAdjacentMachines( struct Machine* machines,
     return result;
 }
 
-bool32_t GetAdjacentMachine( struct Machine* machines,
+bool32_t GetAdjacentMachine( Machine* machines,
                              p2 gridPoint,
-                             struct Machine** buffer,
+							 Machine** buffer,
                              int direction )
 {
     bool32_t result = false;
@@ -500,12 +452,10 @@ bool32_t GetAdjacentMachine( struct Machine* machines,
         case MACHINE_ADJ_BOTTOM_LEFT: offset.x = -1; offset.y = 1; break;
         case MACHINE_ADJ_BOTTOM: offset.y = 1; break;
         case MACHINE_ADJ_BOTTOM_RIGHT: offset.x = 1; offset.y = 1; break;
-        default:
-            throw direction;
     }
 
     p2 index = { gridPoint.x + offset.x, gridPoint.y + offset.y };
-    Machine* ptr = GridToMachine( machines, index );
+	Machine* ptr = GridToMachine( machines, index );
 
     if( ptr && ptr->alive )
     {
@@ -518,9 +468,9 @@ bool32_t GetAdjacentMachine( struct Machine* machines,
     return result;
 }
 
-Machine* PlaceMachine( struct Machine* machines, p2 gridPoint, int type )
+Machine* PlaceMachine( Machine* machines, p2 gridPoint, int type )
 {
-    Machine* machine = GridToMachine( machines, gridPoint );
+	Machine* machine = GridToMachine( machines, gridPoint );
     if( machine && !machine->alive )
     {
         machine->alive = true;
@@ -531,7 +481,7 @@ Machine* PlaceMachine( struct Machine* machines, p2 gridPoint, int type )
     return machine;
 }
 
-bool32_t CreateMachine( struct Machine* machine, p2 gridPoint )
+bool32_t CreateMachine( Machine* machine, p2 gridPoint )
 {
     machine->orientation = ORIENTATION_LEFT;
     machine->gridPoint = gridPoint;
@@ -541,7 +491,7 @@ bool32_t CreateMachine( struct Machine* machine, p2 gridPoint )
     return true;
 }
 
-void RenderMachine( struct Shader* shader, struct Mesh* mesh, struct Machine* machine, v2 position )
+void RenderMachine( Shader* shader, Mesh* mesh, Machine* machine, v2 position )
 {
     if( machine->alive )
     {
@@ -554,15 +504,18 @@ void RenderMachine( struct Shader* shader, struct Mesh* mesh, struct Machine* ma
     }
 }
 
-bool32_t GameInit( struct Memory* memory )
+bool32_t GameInit( Memory* memory )
 {
     bool32_t result = true;
     
-    struct Gamestate* g = (struct Gamestate*)memory->pointer;
-    g->memory.size = memory->size - sizeof(struct Gamestate);
-    g->memory.pointer = (uint8_t*)memory->pointer + sizeof(struct Gamestate);
+	Gamestate* g = (Gamestate*)memory->pointer;
+	int stateSize = sizeof(Gamestate);
+    g->memory.size = memory->size - stateSize;
+    g->memory.pointer = (uint8_t*)memory->pointer + stateSize;
+	
+	printf( "Available memory %d, used %d, temp %d.\n", memory->size, stateSize, g->memory.size );
 
-    struct Vertex quadVertices[] =
+	Vertex quadVertices[] =
         {
             { 0, 0, 0, 0, 0 },
             { 0, 1, 0, 0, 1 },
@@ -618,17 +571,17 @@ bool32_t GameInit( struct Memory* memory )
     return result;
 }
 
-bool32_t GameUpdate( struct Memory* memory, struct Input* newInput, struct Input* oldInput, real64_t dt )
+bool32_t GameUpdate( Memory* memory, Input* newInput, Input* oldInput, real64_t dt )
 {
-    struct Gamestate* g = (struct Gamestate*)memory->pointer;
+	Gamestate* g = (Gamestate*)memory->pointer;
     
-    if( ButtonPressed( newInput, oldInput, BUTTON_LEFT ) )
+    if( ButtonReleased( newInput, oldInput, BUTTON_LEFT ) )
     {
         v2 mpos = newInput->mousePosition;
         v2 worldPos = ScreenToWorld( g->camera.position, mpos );
         p2 gridPoint = WorldToGrid( worldPos );
 
-        Machine* machine = PlaceMachine( g->machines, gridPoint, 2 );
+		Machine* machine = PlaceMachine( g->machines, gridPoint, 2 );
         if( machine )
             printf( "Placed machine at %d:%d\n", gridPoint.x, gridPoint.y );
         else
@@ -637,36 +590,16 @@ bool32_t GameUpdate( struct Memory* memory, struct Input* newInput, struct Input
     return true;
 }
 
-void GameRender( struct Memory* memory )
+void GameRender( Memory* memory )
 {
-    struct Gamestate* g = (struct Gamestate*)memory->pointer;
+	Gamestate* g = (Gamestate*)memory->pointer;
     
     glClearColor( 1.0f, 0.0f, 0.0f, 0.0f );
     glClear( GL_COLOR_BUFFER_BIT );
 
     glUseProgram( g->shader.program );
     glBindTexture( GL_TEXTURE_2D, g->texture.id );
-    
-/*#ifdef _WIN32
-    glUniformMatrix4fv( g->shader.uniforms[PROJECTION_MATRIX], 1, GL_FALSE, value_ptr( g->camera.projection ) );
-    glUniformMatrix4fv( g->shader.uniforms[VIEW_MATRIX], 1, GL_FALSE, value_ptr( g->camera.view ) );
-#else
-    glUniformMatrix4fv( g->shader.uniforms[PROJECTION_MATRIX], 1, GL_FALSE, g->camera.projection.m );
-    glUniformMatrix4fv( g->shader.uniforms[VIEW_MATRIX], 1, GL_FALSE, g->camera.view.m );
-#endif
-
-    for( int y=0; y<GAME_MAP_HEIGHT; y++ )
-    {
-        for( int x=0; x<GAME_MAP_WIDTH; x++ )
-        {
-#ifdef _WIN32
-            RenderTile( &g->shader, &g->quadMesh, g->map[y][x], v2( x*TILE_SIZE, y*TILE_SIZE ) );
-#else
-            RenderTile( &g->shader, &g->quadMesh, g->map[y][x], GLKVector2Make( x*TILE_SIZE, y*TILE_SIZE ) );
-#endif
-        }
-    }*/
-    
+	
     glUniformMatrix4fv( g->shader.uniforms[PROJECTION_MATRIX], 1, GL_FALSE, MATRIX_VALUE( g->camera.projection ) );
     glUniformMatrix4fv( g->shader.uniforms[VIEW_MATRIX], 1, GL_FALSE, MATRIX_VALUE( g->camera.view ) );
     
@@ -674,8 +607,6 @@ void GameRender( struct Memory* memory )
     {
         for( int x=0; x<GAME_MAP_WIDTH; x++ )
         {
-            //RenderTile( &g->shader, &g->quadMesh, g->map[y][x], MAKE_v2( x*TILE_SIZE, y*TILE_SIZE ) );
-            //RenderMachine( &g->shader, &g->quadMesh, &g->machines[y][x], MAKE_v2( x*TILE_SIZE, y*TILE_SIZE ) );
             RenderTile( &g->shader, &g->quadMesh, g->map[TILE_INDEX(x,y)], MAKE_v2( x*TILE_SIZE, y*TILE_SIZE ) );
             RenderMachine( &g->shader, &g->quadMesh, &g->machines[TILE_INDEX(x,y)], MAKE_v2( x*TILE_SIZE, y*TILE_SIZE ) );
         }

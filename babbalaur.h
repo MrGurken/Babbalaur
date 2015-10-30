@@ -58,11 +58,11 @@ typedef int32_t bool32_t;
 typedef float real32_t;
 typedef double real64_t;
 
-struct Memory
+typedef struct MemoryTag
 {
     void* pointer;
     uint32_t size;
-};
+} Memory;
 
 enum
 {
@@ -79,13 +79,13 @@ enum
     MAX_KEYS
 };
 
-struct Input
+typedef struct InputTag
 {
     v2 mousePosition;
     v2 mouseDelta;
     bool32_t buttons[MAX_BUTTONS];
     bool32_t keys[MAX_KEYS];
-};
+} Input;
 
 #define SHADER_MAX_UNIFORMS 14
 enum
@@ -97,40 +97,40 @@ enum
     UV_LENGTH
 };
 
-struct Shader
+typedef struct ShaderTag
 {
     GLuint program;
     GLuint uniforms[SHADER_MAX_UNIFORMS];
     int nuniforms;
-};
+} Shader;
 
-struct Vertex
+typedef struct VertexTag
 {
     real32_t x, y, z;
     real32_t u, v;
-};
+} Vertex;
 
-struct Texture
+typedef struct TextureTag
 {
     GLuint id;
     int width;
     int height;
-};
+} Texture;
 
-struct Mesh
+typedef struct MeshTag
 {
     GLuint vao;
     GLuint vbo;
     GLuint ibo;
     int size;
-};
+} Mesh;
 
-struct Camera
+typedef struct CameraTag
 {
     v3 position;
     m4 projection;
     m4 view;
-};
+} Camera;
 
 enum
 {
@@ -154,28 +154,28 @@ enum
 };
 #define MACHINE_ADJ_LENGTH 3
 
-struct Machine
+typedef struct MachineTag
 {
     int orientation;
     p2 gridPoint;
     bool32_t alive;
     int type;
-};
+} Machine;
 
-struct Gamestate
+typedef struct GamestateTag
 {
-    struct Mesh quadMesh;
-    struct Shader shader;
-    struct Camera camera;
-    struct Texture texture;
+	Mesh quadMesh;
+	Shader shader;
+	Camera camera;
+	Texture texture;
     uint8_t map[GAME_MAP_HEIGHT*GAME_MAP_WIDTH];
-    Machine machines[GAME_MAP_HEIGHT*GAME_MAP_WIDTH];
-    struct Memory memory;
-};
+	Machine machines[GAME_MAP_HEIGHT*GAME_MAP_WIDTH];
+	Memory memory;
+} Gamestate;
 
-bool32_t GameInit( struct Memory* memory );
-bool32_t GameUpdate( struct Memory* memory, struct Input* newInput, struct Input* oldInput, real64_t dt );
-void GameRender( struct Memory* memory );
+bool32_t GameInit( Memory* memory );
+bool32_t GameUpdate( Memory* memory, Input* newInput, Input* oldInput, real64_t dt );
+void GameRender( Memory* memory );
 
 #define BABBALAUR_H
 #endif

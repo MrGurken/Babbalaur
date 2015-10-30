@@ -16,9 +16,9 @@
 
 @interface GameViewController()
 {
-	struct Memory memory;
-	struct Input newInput;
-	struct Input oldInput;
+	Memory memory;
+	Input newInput;
+	Input oldInput;
 }
 @property (strong, nonatomic) EAGLContext* context;
 
@@ -46,7 +46,7 @@
 	
 	[self startGL];
 	
-	memory.size = KILOBYTES(2);
+	memory.size = GAME_MEMORY_POOL;
 	memory.pointer = malloc( memory.size );
 	
 	GameInit( &memory );
@@ -92,6 +92,30 @@
 -(void)stopGL
 {
 	[EAGLContext setCurrentContext:self.context];
+}
+
+-(void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
+{
+	oldInput.buttons[BUTTON_LEFT] = false;
+	newInput.buttons[BUTTON_LEFT] = true;
+}
+
+-(void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
+{
+	CGPoint point = [[touches anyObject] locationInView:self.view];
+	
+	oldInput.mousePosition.x = newInput.mousePosition.x;
+	oldInput.mousePosition.y = newInput.mousePosition.y;
+	
+	newInput.mousePosition.x = point.x;
+	newInput.mousePosition.y = point.y;
+}
+
+-(void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
+{
+	oldInput.buttons[BUTTON_LEFT] = true;
+	newInput.buttons[BUTTON_LEFT] = false;
+	printf("ENDED\n");
 }
 
 -(void)update
