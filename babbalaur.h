@@ -29,10 +29,22 @@
 
 #endif
 
+#ifdef _WIN32
+
 #define WINDOW_X SDL_WINDOWPOS_UNDEFINED
 #define WINDOW_Y SDL_WINDOWPOS_UNDEFINED
 #define WINDOW_W 640
 #define WINDOW_H 480
+
+#else
+
+#define WINDOW_X 32
+#define WINDOW_Y 32
+#define WINDOW_W 640
+#define WINDOW_H 960
+
+#endif
+
 #define WINDOW_TITLE "Babba Laur"
 
 #define GAME_DT 0.015

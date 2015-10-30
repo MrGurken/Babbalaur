@@ -19,6 +19,7 @@
 	Memory memory;
 	Input newInput;
 	Input oldInput;
+	Input internalInput;
 }
 @property (strong, nonatomic) EAGLContext* context;
 
@@ -96,30 +97,39 @@
 
 -(void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
 {
-	oldInput.buttons[BUTTON_LEFT] = false;
-	newInput.buttons[BUTTON_LEFT] = true;
+	CGPoint point = [[touches anyObject] locationInView:self.view];
+	
+	internalInput.buttons[BUTTON_LEFT] = true;
+	internalInput.mousePosition.x = point.x;
+	internalInput.mousePosition.y = point.y;
 }
 
 -(void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
 {
 	CGPoint point = [[touches anyObject] locationInView:self.view];
 	
-	oldInput.mousePosition.x = newInput.mousePosition.x;
-	oldInput.mousePosition.y = newInput.mousePosition.y;
-	
-	newInput.mousePosition.x = point.x;
-	newInput.mousePosition.y = point.y;
+	internalInput.mousePosition.x = point.x;
+	internalInput.mousePosition.y = point.y;
 }
 
 -(void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
 {
-	oldInput.buttons[BUTTON_LEFT] = true;
-	newInput.buttons[BUTTON_LEFT] = false;
-	printf("ENDED\n");
+	internalInput.buttons[BUTTON_LEFT] = false;
 }
 
 -(void)update
 {
+	oldInput = newInput;
+	
+	for( int i=0; i<MAX_KEYS; i++ )
+		newInput.keys[i] = internalInput.keys[i];
+	for( int i=0; i<MAX_BUTTONS; i++ )
+		newInput.buttons[i] = internalInput.buttons[i];
+	
+	newInput.mousePosition = internalInput.mousePosition;
+	newInput.mouseDelta.x = newInput.mousePosition.x - oldInput.mousePosition.x;
+	newInput.mouseDelta.y = newInput.mousePosition.y - oldInput.mousePosition.y;
+	
 	GameUpdate( &memory, &newInput, &oldInput, GAME_DT );
 }
 
