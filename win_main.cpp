@@ -29,7 +29,7 @@ int main( int argc, char* argv[] )
                 return -1;
             
             Memory memory;
-            memory.size = KILOBYTES(2);
+            memory.size = GAME_MEMORY_POOL;
             memory.pointer = malloc( memory.size );
 
             Input newInput = {}, oldInput = {};
@@ -61,26 +61,30 @@ int main( int argc, char* argv[] )
                             if( e.key.keysym.sym == SDLK_ESCAPE )
                                 running = false;
                             else if( e.key.keysym.sym == SDLK_SPACE )
-                                newInput.spaceDown = true;
+                                newInput.keys[KEY_SPACE] = true;
+                            else if( e.key.keysym.sym == SDLK_RETURN )
+                                newInput.keys[KEY_ENTER] = true;
                         }
                         else if( e.type == SDL_KEYUP )
                         {
                             if( e.key.keysym.sym == SDLK_SPACE )
-                                newInput.spaceDown = false;
+                                newInput.keys[KEY_SPACE] = false;
+                            else if( e.key.keysym.sym == SDLK_RETURN )
+                                newInput.keys[KEY_ENTER] = false;
                         }
                         else if( e.type == SDL_MOUSEBUTTONDOWN )
                         {
                             if( e.button.button == SDL_BUTTON_LEFT )
-                                newInput.lmbDown = true;
+                                newInput.buttons[BUTTON_LEFT] = true;
                             else if( e.button.button == SDL_BUTTON_RIGHT )
-                                newInput.rmbDown = true;
+                                newInput.buttons[BUTTON_RIGHT] = true;
                         }
                         else if( e.type == SDL_MOUSEBUTTONUP )
                         {
                             if( e.button.button == SDL_BUTTON_LEFT )
-                                newInput.lmbDown = false;
+                                newInput.buttons[BUTTON_LEFT] = false;
                             else if( e.button.button == SDL_BUTTON_RIGHT )
-                                newInput.rmbDown = false;
+                                newInput.buttons[BUTTON_RIGHT] = false;
                         }
                         else if( e.type == SDL_MOUSEMOTION )
                         {

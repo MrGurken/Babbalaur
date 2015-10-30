@@ -36,6 +36,14 @@
 #define WINDOW_TITLE "Babba Laur"
 
 #define GAME_DT 0.015
+#define GAME_MAP_WIDTH 10
+#define GAME_MAP_HEIGHT 10
+#define GAME_MEMORY_POOL KILOBYTES(64)
+
+#define TILESHEET_WIDTH 10
+#define TILE_UV_LENGTH ( 1.0f / TILESHEET_WIDTH )
+#define TILE_SIZE 32.0f
+#define TILE_INDEX(x,y) (y*GAME_MAP_WIDTH+x)
 
 #define KILOBYTES(n) (1024*n)
 #define MEGABYTES(n) (1024*KILOBYTES(n))
@@ -56,13 +64,27 @@ struct Memory
     uint32_t size;
 };
 
+enum
+{
+    BUTTON_LEFT=0,
+    BUTTON_RIGHT,
+    BUTTON_MIDDLE,
+    MAX_BUTTONS
+};
+
+enum
+{
+    KEY_SPACE=0,
+    KEY_ENTER,
+    MAX_KEYS
+};
+
 struct Input
 {
     v2 mousePosition;
     v2 mouseDelta;
-    bool32_t lmbDown;
-    bool32_t rmbDown;
-    bool32_t spaceDown;
+    bool32_t buttons[MAX_BUTTONS];
+    bool32_t keys[MAX_KEYS];
 };
 
 #define SHADER_MAX_UNIFORMS 14
@@ -110,19 +132,44 @@ struct Camera
     m4 view;
 };
 
-#define TILESHEET_WIDTH 10
-#define TILE_UV_LENGTH ( 1.0f / TILESHEET_WIDTH )
-#define TILE_SIZE 32.0f
+enum
+{
+    ORIENTATION_LEFT = 0,
+    ORIENTATION_RIGHT,
+    ORIENTATION_TOP,
+    ORIENTATION_BOTTOM
+};
 
-#define GAME_MAP_WIDTH 10
-#define GAME_MAP_HEIGHT 10
+enum
+{
+    MACHINE_ADJ_TOP_LEFT = 0,
+    MACHINE_ADJ_TOP,
+    MACHINE_ADJ_TOP_RIGHT,
+    MACHINE_ADJ_LEFT,
+    MACHINE_ADJ_RIGHT,
+    MACHINE_ADJ_BOTTOM_LEFT,
+    MACHINE_ADJ_BOTTOM,
+    MACHINE_ADJ_BOTTOM_RIGHT,
+    MACHINE_MAX_ADJ
+};
+#define MACHINE_ADJ_LENGTH 3
+
+struct Machine
+{
+    int orientation;
+    p2 gridPoint;
+    bool32_t alive;
+    int type;
+};
+
 struct Gamestate
 {
     struct Mesh quadMesh;
     struct Shader shader;
     struct Camera camera;
     struct Texture texture;
-    uint8_t map[GAME_MAP_HEIGHT][GAME_MAP_WIDTH];
+    uint8_t map[GAME_MAP_HEIGHT*GAME_MAP_WIDTH];
+    Machine machines[GAME_MAP_HEIGHT*GAME_MAP_WIDTH];
     struct Memory memory;
 };
 

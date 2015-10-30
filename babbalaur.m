@@ -9,6 +9,57 @@
 #include "babbalaur.h"
 
 #ifdef _WIN32
+bool32_t ButtonDown( struct Input* input, int index )
+{
+    return input->buttons[index];
+}
+
+bool32_t ButtonUp( struct Input* input, int index )
+{
+    return !input->buttons[index];
+}
+
+bool32_t ButtonPressed( struct Input* newInput, struct Input* oldInput, int index )
+{
+    if( ButtonUp( newInput, index ) )
+        return false;
+    return ButtonUp( oldInput, index );
+}
+
+bool32_t ButtonReleased( struct Input* newInput, struct Input* oldInput, int index )
+{
+    if( ButtonDown( newInput, index ) )
+        return false;
+    return ButtonDown( oldInput, index );
+}
+
+bool32_t KeyDown( struct Input* input, int index )
+{
+    return input->keys[index];
+}
+
+bool32_t KeyUp( struct Input* input, int index )
+{
+    return !input->keys[index];
+}
+
+bool32_t KeyPressed( struct Input* newInput, struct Input* oldInput, int index )
+{
+    if( KeyUp( newInput, index ) )
+        return false;
+    return KeyUp( oldInput, index );
+}
+
+bool32_t KeyReleased( struct Input* newInput, struct Input* oldInput, int index )
+{
+    if( KeyDown( newInput, index ) )
+        return false;
+    return KeyDown( oldInput, index );
+}
+#else
+#endif
+
+#ifdef _WIN32
 bool32_t ReadFile( const char* file, const char* fileType, struct Memory* memory )
 {
     bool32_t result = false;
@@ -349,6 +400,160 @@ bool32_t CreateCamera( struct Camera* camera )
     return true;
 }
 
+uint8_t GetTileID( uint8_t* map, int x, int y, int pitch = GAME_MAP_WIDTH )
+{
+    return map[y*pitch+x];
+}
+
+v2 ScreenToWorld( v3 world, v2 screen )
+{
+    return MAKE_v2( screen.x+world.x, screen.y+world.y );
+}
+
+v2 ScreenToWorld( v2 world, v2 screen )
+{
+    return MAKE_v2( screen.x+world.x, screen.y+world.y );
+}
+
+v2 WorldToScreen( v3 world, v2 screen )
+{
+    return MAKE_v2( screen.x+world.x, screen.y+world.y );
+}
+
+v2 WorldToScreen( v2 world, v2 screen )
+{
+    return MAKE_v2( screen.x+world.x, screen.y+world.y );
+}
+
+p2 WorldToGrid( v2 world )
+{
+    p2 gridPoint;
+    gridPoint.x = (int)( world.x / TILE_SIZE );
+    gridPoint.y = (int)( world.y / TILE_SIZE );
+    return gridPoint;
+}
+
+Machine* GetMachine( struct Machine* machines, int x, int y, int pitch = GAME_MAP_WIDTH )
+{
+    return &machines[y*pitch+x];
+}
+
+Machine* GridToMachine( struct Machine* machines, p2 gridPoint,
+                        int w = GAME_MAP_WIDTH, int h = GAME_MAP_HEIGHT )
+{
+    Machine* result = 0;
+
+    if( gridPoint.x >= 0 && gridPoint.x < w &&
+        gridPoint.y >= 0 && gridPoint.y < h )
+    {
+        result = GetMachine( machines, gridPoint.x, gridPoint.y, w );
+    }
+    
+    return result;
+}
+
+bool32_t GetAdjacentMachines( struct Machine* machines,
+                              p2 gridPoint,
+                              struct Machine** buffer )
+{
+    bool32_t result = false;
+
+    int i=0;
+    for( int y=gridPoint.y-1; y<MACHINE_ADJ_LENGTH; y++ )
+    {
+        for( int x=gridPoint.x-1; x<MACHINE_ADJ_LENGTH; x++, i++ )
+        {
+            if( x == 1 && y == 1 )
+                continue;
+            
+            p2 index = { x, y };
+            Machine* ptr = GridToMachine( machines, index );
+
+            if( ptr && ptr->alive )
+            {
+                result = true;
+                buffer[i] = ptr;
+            }
+            else
+                buffer[i] = 0;
+        }
+    }
+    
+    return result;
+}
+
+bool32_t GetAdjacentMachine( struct Machine* machines,
+                             p2 gridPoint,
+                             struct Machine** buffer,
+                             int direction )
+{
+    bool32_t result = false;
+    
+    p2 offset = {};
+    switch( direction )
+    {
+        case MACHINE_ADJ_TOP_LEFT: offset.x = -1; offset.y = -1; break;
+        case MACHINE_ADJ_TOP: offset.y = -1; break;
+        case MACHINE_ADJ_TOP_RIGHT: offset.x = 1; offset.y = -1; break;
+        case MACHINE_ADJ_LEFT: offset.x = -1; break;
+        case MACHINE_ADJ_RIGHT: offset.x = 1; break;
+        case MACHINE_ADJ_BOTTOM_LEFT: offset.x = -1; offset.y = 1; break;
+        case MACHINE_ADJ_BOTTOM: offset.y = 1; break;
+        case MACHINE_ADJ_BOTTOM_RIGHT: offset.x = 1; offset.y = 1; break;
+        default:
+            throw direction;
+    }
+
+    p2 index = { gridPoint.x + offset.x, gridPoint.y + offset.y };
+    Machine* ptr = GridToMachine( machines, index );
+
+    if( ptr && ptr->alive )
+    {
+        *buffer = ptr;
+        result = true;
+    }
+    else
+        *buffer = 0;
+
+    return result;
+}
+
+Machine* PlaceMachine( struct Machine* machines, p2 gridPoint, int type )
+{
+    Machine* machine = GridToMachine( machines, gridPoint );
+    if( machine && !machine->alive )
+    {
+        machine->alive = true;
+        machine->type = type;
+    }
+    else
+        machine = 0;
+    return machine;
+}
+
+bool32_t CreateMachine( struct Machine* machine, p2 gridPoint )
+{
+    machine->orientation = ORIENTATION_LEFT;
+    machine->gridPoint = gridPoint;
+    machine->alive = false;
+    machine->type = 1;
+
+    return true;
+}
+
+void RenderMachine( struct Shader* shader, struct Mesh* mesh, struct Machine* machine, v2 position )
+{
+    if( machine->alive )
+    {
+        m4 modelMatrix = MATRIX_MULTIPLY( MATRIX_TRANSLATION( position.x, position.y, 0.0f ), MATRIX_SCALE( TILE_SIZE, TILE_SIZE, 1.0f ) );
+        glUniformMatrix4fv( shader->uniforms[MODEL_MATRIX], 1, GL_FALSE, MATRIX_VALUE(modelMatrix) );
+        glUniform2f( shader->uniforms[UV_OFFSET], 0.0f, 0.0f );
+        glUniform1f( shader->uniforms[UV_LENGTH], 1.0f );
+
+        RenderMesh( mesh );
+    }
+}
+
 bool32_t GameInit( struct Memory* memory )
 {
     bool32_t result = true;
@@ -400,7 +605,13 @@ bool32_t GameInit( struct Memory* memory )
     {
         for( int x=0; x<GAME_MAP_WIDTH; x++ )
         {
-            g->map[y][x] = y*TILESHEET_WIDTH+x+1;
+            g->map[TILE_INDEX(x,y)] = TILE_INDEX(x,y)+1;
+
+            p2 gridPoint = { x, y };
+            if( !CreateMachine( &g->machines[TILE_INDEX(x,y)], gridPoint ) )
+            {
+                result = false;
+            }
         }
     }
     
@@ -409,6 +620,20 @@ bool32_t GameInit( struct Memory* memory )
 
 bool32_t GameUpdate( struct Memory* memory, struct Input* newInput, struct Input* oldInput, real64_t dt )
 {
+    struct Gamestate* g = (struct Gamestate*)memory->pointer;
+    
+    if( ButtonPressed( newInput, oldInput, BUTTON_LEFT ) )
+    {
+        v2 mpos = newInput->mousePosition;
+        v2 worldPos = ScreenToWorld( g->camera.position, mpos );
+        p2 gridPoint = WorldToGrid( worldPos );
+
+        Machine* machine = PlaceMachine( g->machines, gridPoint, 2 );
+        if( machine )
+            printf( "Placed machine at %d:%d\n", gridPoint.x, gridPoint.y );
+        else
+            printf( "Failed to place machine.\n" );
+    }
     return true;
 }
 
@@ -449,7 +674,10 @@ void GameRender( struct Memory* memory )
     {
         for( int x=0; x<GAME_MAP_WIDTH; x++ )
         {
-            RenderTile( &g->shader, &g->quadMesh, g->map[y][x], MAKE_V2( x*TILE_SIZE, y*TILE_SIZE ) );
+            //RenderTile( &g->shader, &g->quadMesh, g->map[y][x], MAKE_v2( x*TILE_SIZE, y*TILE_SIZE ) );
+            //RenderMachine( &g->shader, &g->quadMesh, &g->machines[y][x], MAKE_v2( x*TILE_SIZE, y*TILE_SIZE ) );
+            RenderTile( &g->shader, &g->quadMesh, g->map[TILE_INDEX(x,y)], MAKE_v2( x*TILE_SIZE, y*TILE_SIZE ) );
+            RenderMachine( &g->shader, &g->quadMesh, &g->machines[TILE_INDEX(x,y)], MAKE_v2( x*TILE_SIZE, y*TILE_SIZE ) );
         }
     }
 }
