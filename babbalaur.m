@@ -353,9 +353,9 @@ bool32_t CreateCamera( Camera* camera )
     return true;
 }
 
-uint8_t GetTileID( uint8_t* map, int x, int y, int pitch )
+uint8_t GetTileID( uint8_t* map, int x, int y )
 {
-    return map[y*pitch+x];
+    return map[y*GAME_MAP_WIDTH+x];
 }
 
 v2 ScreenToWorld( v3 world, v2 screen )
@@ -393,7 +393,7 @@ Machine* GetMachine( Machine* machines, int x, int y )
 
 Machine* GridToMachine( Machine* machines, p2 gridPoint )
 {
-	Machine* result = 0;
+    Machine* result = 0;
 
     if( gridPoint.x >= 0 && gridPoint.x < GAME_MAP_WIDTH &&
         gridPoint.y >= 0 && gridPoint.y < GAME_MAP_HEIGHT )
@@ -406,7 +406,7 @@ Machine* GridToMachine( Machine* machines, p2 gridPoint )
 
 bool32_t GetAdjacentMachines( Machine* machines,
                               p2 gridPoint,
-							  Machine** buffer )
+                              Machine** buffer )
 {
     bool32_t result = false;
 
@@ -419,7 +419,7 @@ bool32_t GetAdjacentMachines( Machine* machines,
                 continue;
             
             p2 index = { x, y };
-			Machine* ptr = GridToMachine( machines, index );
+            Machine* ptr = GridToMachine( machines, index );
 
             if( ptr && ptr->alive )
             {
@@ -436,7 +436,7 @@ bool32_t GetAdjacentMachines( Machine* machines,
 
 bool32_t GetAdjacentMachine( Machine* machines,
                              p2 gridPoint,
-							 Machine** buffer,
+                             Machine** buffer,
                              int direction )
 {
     bool32_t result = false;
@@ -455,7 +455,7 @@ bool32_t GetAdjacentMachine( Machine* machines,
     }
 
     p2 index = { gridPoint.x + offset.x, gridPoint.y + offset.y };
-	Machine* ptr = GridToMachine( machines, index );
+    Machine* ptr = GridToMachine( machines, index );
 
     if( ptr && ptr->alive )
     {
@@ -470,7 +470,7 @@ bool32_t GetAdjacentMachine( Machine* machines,
 
 Machine* PlaceMachine( Machine* machines, p2 gridPoint, int type )
 {
-	Machine* machine = GridToMachine( machines, gridPoint );
+    Machine* machine = GridToMachine( machines, gridPoint );
     if( machine && !machine->alive )
     {
         machine->alive = true;
@@ -508,14 +508,14 @@ bool32_t GameInit( Memory* memory )
 {
     bool32_t result = true;
     
-	Gamestate* g = (Gamestate*)memory->pointer;
-	int stateSize = sizeof(Gamestate);
+    Gamestate* g = (Gamestate*)memory->pointer;
+    int stateSize = sizeof(Gamestate);
     g->memory.size = memory->size - stateSize;
     g->memory.pointer = (uint8_t*)memory->pointer + stateSize;
-	
-	printf( "Available memory %d, used %d, temp %d.\n", memory->size, stateSize, g->memory.size );
+    
+    printf( "Available memory %d, used %d, temp %d.\n", memory->size, stateSize, g->memory.size );
 
-	Vertex quadVertices[] =
+    Vertex quadVertices[] =
         {
             { 0, 0, 0, 0, 0 },
             { 0, 1, 0, 0, 1 },
@@ -573,7 +573,7 @@ bool32_t GameInit( Memory* memory )
 
 bool32_t GameUpdate( Memory* memory, Input* newInput, Input* oldInput, real64_t dt )
 {
-	Gamestate* g = (Gamestate*)memory->pointer;
+    Gamestate* g = (Gamestate*)memory->pointer;
     
     if( ButtonReleased( newInput, oldInput, BUTTON_LEFT ) )
     {
@@ -581,7 +581,7 @@ bool32_t GameUpdate( Memory* memory, Input* newInput, Input* oldInput, real64_t 
         v2 worldPos = ScreenToWorld( g->camera.position, mpos );
         p2 gridPoint = WorldToGrid( worldPos );
 
-		Machine* machine = PlaceMachine( g->machines, gridPoint, 2 );
+        Machine* machine = PlaceMachine( g->machines, gridPoint, 2 );
         if( machine )
             printf( "Placed machine at %d:%d\n", gridPoint.x, gridPoint.y );
         else
@@ -592,14 +592,14 @@ bool32_t GameUpdate( Memory* memory, Input* newInput, Input* oldInput, real64_t 
 
 void GameRender( Memory* memory )
 {
-	Gamestate* g = (Gamestate*)memory->pointer;
+    Gamestate* g = (Gamestate*)memory->pointer;
     
     glClearColor( 1.0f, 0.0f, 0.0f, 0.0f );
     glClear( GL_COLOR_BUFFER_BIT );
 
     glUseProgram( g->shader.program );
     glBindTexture( GL_TEXTURE_2D, g->texture.id );
-	
+    
     glUniformMatrix4fv( g->shader.uniforms[PROJECTION_MATRIX], 1, GL_FALSE, MATRIX_VALUE( g->camera.projection ) );
     glUniformMatrix4fv( g->shader.uniforms[VIEW_MATRIX], 1, GL_FALSE, MATRIX_VALUE( g->camera.view ) );
     
