@@ -39,6 +39,9 @@ bool32_t ReadFile( const char* file, const char* fileType, Memory* memory )
 
 #else
 
+#import <UIKit/UIKit.h>
+#import <GLKit/GLKit.h>
+
 bool32_t ReadFile( const char* file, const char* fileType, Memory* memory )
 {
     bool32_t result = false;
