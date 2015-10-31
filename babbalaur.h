@@ -73,7 +73,7 @@ typedef struct MemoryTag
 
 #include "maths.h"
 #include "graphics.h"
-//#include "io.h"
+#include "io.h"
 
 enum
 {
