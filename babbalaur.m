@@ -56,6 +56,255 @@ bool32_t KeyReleased( Input* newInput, Input* oldInput, int index )
     return KeyDown( oldInput, index );
 }
 
+#ifdef _WIN32
+bool32_t ReadFile( const char* file, const char* fileType, Memory* memory )
+{
+    bool32_t result = false;
+    
+    std::ifstream stream( file, std::ios::in | std::ios::binary );
+    if( stream.is_open() )
+    {
+        stream.seekg( 0, std::ios::end );
+        int len = stream.tellg();
+        stream.seekg( 0, std::ios::beg );
+        
+        if( len < memory->size )
+        {
+            stream.read( (char*)memory->pointer, len );
+            ((char*)memory->pointer)[len] = 0;
+            result = true;
+        }
+
+        stream.close();
+    }
+    
+    return result;
+}
+#else
+bool32_t ReadFile( const char* file, const char* fileType, Memory* memory )
+{
+    bool32_t result = false;
+    
+    NSString* path = [[NSBundle mainBundle] pathForResource:[NSString stringWithUTF8String:file] ofType:[NSString stringWithUTF8String:fileType]];
+    NSString* content = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil];
+    if( content.length < memory->size )
+    {
+        memcpy( memory->pointer, [content UTF8String], content.length );
+        ((char*)memory->pointer)[content.length] = 0; // null terminate string
+        result = true;
+    }
+    
+    return result;
+}
+#endif
+
+void MemTexture( Texture* texture, int width, int height, void* pixels, GLenum format )
+{
+    glGenTextures( 1, &texture->id );
+    glBindTexture( GL_TEXTURE_2D, texture->id );
+    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+    glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, format, GL_UNSIGNED_BYTE, pixels );
+
+    texture->width = width;
+    texture->height = height;
+}
+
+#ifdef _WIN32
+bool32_t LoadTexture( Texture* texture, const char* file )
+{
+    bool32_t result = false;
+
+    SDL_Surface* img = IMG_Load( file );
+    if( img )
+    {
+        GLenum format = ( img->format->BytesPerPixel == 4 ? GL_RGBA : GL_RGB );
+        MemTexture( texture, img->w, img->h, img->pixels, format );
+        SDL_FreeSurface( img );
+        result = true;
+    }
+
+    return result;
+}
+#else
+bool32_t LoadTexture( Texture* texture, const char* file )
+{
+    bool32_t result = false;
+    
+    NSString* texturePath = [[NSBundle mainBundle] pathForResource:[NSString stringWithUTF8String:file] ofType:@"png"];
+    NSError* theError;
+    GLKTextureInfo* info = [GLKTextureLoader textureWithContentsOfFile:texturePath options:nil error:&theError];
+    
+    texture->id = info.name;
+    texture->width = info.width;
+    texture->height = info.height;
+    
+    return result;
+}
+#endif
+
+void UnloadTexture( Texture* texture )
+{
+    if( texture->id > 0 )
+        glDeleteTextures( 1, &texture->id );
+    
+    texture->id = 0;
+    texture->width = texture->height = 0;
+}
+
+bool32_t CreateShader( Shader* shader )
+{
+    shader->program = glCreateProgram();
+    shader->nuniforms = 0;
+
+    return true;
+}
+
+bool32_t MemShader( Shader* shader, const char* source, GLenum type )
+{
+    bool32_t result = true;
+    
+    GLuint s = glCreateShader( type );
+    glShaderSource( s, 1, &source, 0 );
+    glCompileShader( s );
+
+#ifdef DEBUG
+    GLint success;
+    glGetShaderiv( s, GL_COMPILE_STATUS, &success );
+    if( success == GL_FALSE )
+    {
+        char buf[1024] = {};
+        int len = 1024;
+        glGetShaderInfoLog( s, 1024, &len, buf );
+        printf( "Shader compilation failed:\n%s\n", buf );
+        result = false;
+    }
+    else
+#endif
+    {
+        glAttachShader( shader->program, s );
+        glDeleteShader( s );
+    }
+
+    return result;
+}
+
+bool32_t LoadShader( Shader* shader, Memory* memory, const char* file, GLenum type )
+{
+    const char* fileType = ( type == GL_VERTEX_SHADER ? "vs" : "fs" );
+    if( ReadFile( file, fileType, memory ) )
+        return MemShader( shader, (const char*)memory->pointer, type );
+    return false;
+}
+
+bool32_t LinkShader( Shader* shader )
+{
+    bool32_t result = true;
+    glLinkProgram( shader->program );
+
+#ifdef DEBUG
+    GLint success;
+    glGetProgramiv( shader->program, GL_LINK_STATUS, &success );
+    if( success == GL_FALSE )
+    {
+        char buf[1024] = {};
+        int len = 1024;
+        glGetProgramInfoLog( shader->program, 1024, &len, buf );
+        printf( "Shader linking failed:\n%s\n", buf );
+        result = false;
+    }
+#endif
+
+    return result;
+}
+
+bool32_t AddUniform( Shader* shader, const char* uniform )
+{
+    bool32_t result = false;
+    
+    GLint location = glGetUniformLocation( shader->program, uniform );
+    shader->uniforms[shader->nuniforms++] = location;
+    result = ( location >= 0 );
+
+    return result;
+}
+
+bool32_t CreateMesh( Mesh* mesh )
+{
+#ifdef _WIN32
+    glGenVertexArrays( 1, &mesh->vao );
+    glBindVertexArray( mesh->vao );
+#else
+    glGenVertexArraysOES( 1, &mesh->vao );
+    glBindVertexArrayOES( mesh->vao );
+#endif
+
+    glGenBuffers( 1, &mesh->vbo );
+    glBindBuffer( GL_ARRAY_BUFFER, mesh->vbo );
+    
+    glGenBuffers( 1, &mesh->ibo );
+    glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, mesh->ibo );
+
+    glEnableVertexAttribArray( 0 );
+    glEnableVertexAttribArray( 1 );
+
+    glVertexAttribPointer( 0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0 );
+    glVertexAttribPointer( 1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(GLfloat)*3) );
+
+    glBindBuffer( GL_ARRAY_BUFFER, 0 );
+    glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
+#ifdef _WIN32
+    glBindVertexArray( 0 );
+#else
+    glBindVertexArrayOES( 0 );
+#endif
+    
+    mesh->size = 0;
+    return true;
+}
+
+bool32_t BufferMesh( Mesh* mesh, Vertex* v, int nv, GLuint* i, int ni )
+{
+#ifdef _WIN32
+    glBindVertexArray( mesh->vao );
+#else
+    glBindVertexArrayOES( mesh->vao );
+#endif
+    
+    glBindBuffer( GL_ARRAY_BUFFER, mesh->vbo );
+    glBufferData( GL_ARRAY_BUFFER, sizeof(Vertex)*nv, v, GL_STATIC_DRAW );
+
+    glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, mesh->ibo );
+    glBufferData( GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint)*ni, i, GL_STATIC_DRAW );
+
+    glBindBuffer( GL_ARRAY_BUFFER, 0 );
+    glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
+    
+#ifdef _WIN32
+    glBindVertexArray( 0 );
+#else
+    glBindVertexArrayOES( 0 );
+#endif
+
+    mesh->size = ni;
+
+    return true;
+}
+
+void RenderMesh( Mesh* mesh )
+{
+#ifdef _WIN32
+    glBindVertexArray( mesh->vao );
+#else
+    glBindVertexArrayOES( mesh->vao );
+#endif
+    glBindBuffer( GL_ARRAY_BUFFER, mesh->vbo );
+    glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, mesh->ibo );
+    glDrawElements( GL_TRIANGLES, mesh->size, GL_UNSIGNED_INT, 0 );
+}
+
 v2 GetTileOffset( uint8_t id )
 {
     v2 result;
@@ -87,8 +336,18 @@ void RenderTile( Shader* shader, Mesh* mesh, uint8_t id, v2 position )
 bool32_t CreateCamera( Camera* camera )
 {
     camera->position.x = camera->position.y = camera->position.z = 0.0f;
+
+    v2 bounds;
+#ifdef _WIN32
+    bounds.x = WINDOW_W;
+    bounds.y = WINDOW_H;
+#else
+    CGRect br = [[UIScreen mainScreen] bounds];
+    bounds.x = br.size.width;
+    bounds.y = br.size.height;
+#endif
     
-    camera->projection = MATRIX_ORTHO( (real32_t)WINDOW_W, (real32_t)WINDOW_H );
+    camera->projection = MATRIX_ORTHO( bounds.x, bounds.y );
     camera->view = MATRIX_IDENTITY;
 
     return true;
@@ -104,10 +363,20 @@ v2 ScreenToWorld( v3 world, v2 screen )
     return MAKE_v2( screen.x+world.x, screen.y+world.y );
 }
 
+/*v2 ScreenToWorld( v2 world, v2 screen )
+{
+    return MAKE_v2( screen.x+world.x, screen.y+world.y );
+}*/
+
 v2 WorldToScreen( v3 world, v2 screen )
 {
     return MAKE_v2( screen.x+world.x, screen.y+world.y );
 }
+
+/*v2 WorldToScreen( v2 world, v2 screen )
+{
+    return MAKE_v2( screen.x+world.x, screen.y+world.y );
+}*/
 
 p2 WorldToGrid( v2 world )
 {
