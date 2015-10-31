@@ -98,20 +98,6 @@ bool32_t ReadFile( const char* file, const char* fileType, Memory* memory )
 }
 #endif
 
-void MemTexture( Texture* texture, int width, int height, void* pixels, GLenum format )
-{
-    glGenTextures( 1, &texture->id );
-    glBindTexture( GL_TEXTURE_2D, texture->id );
-    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
-    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
-    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
-    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
-    glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, format, GL_UNSIGNED_BYTE, pixels );
-
-    texture->width = width;
-    texture->height = height;
-}
-
 #ifdef _WIN32
 bool32_t LoadTexture( Texture* texture, const char* file )
 {
@@ -121,7 +107,16 @@ bool32_t LoadTexture( Texture* texture, const char* file )
     if( img )
     {
         GLenum format = ( img->format->BytesPerPixel == 4 ? GL_RGBA : GL_RGB );
-        MemTexture( texture, img->w, img->h, img->pixels, format );
+        glGenTextures( 1, &texture->id );
+        glBindTexture( GL_TEXTURE_2D, texture->id );
+        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+        glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, img->w, img->h, 0, format, GL_UNSIGNED_BYTE, img->pixels );
+
+        texture->width = img->w;
+        texture->height = img->h;
         SDL_FreeSurface( img );
         result = true;
     }
@@ -233,14 +228,9 @@ bool32_t AddUniform( Shader* shader, const char* uniform )
 
 bool32_t CreateMesh( Mesh* mesh )
 {
-#ifdef _WIN32
-    glGenVertexArrays( 1, &mesh->vao );
-    glBindVertexArray( mesh->vao );
-#else
-    glGenVertexArraysOES( 1, &mesh->vao );
-    glBindVertexArrayOES( mesh->vao );
-#endif
-
+    GEN_VERTEX_ARRAYS( 1, &mesh->vao );
+    BIND_VERTEX_ARRAY( mesh->vao );
+    
     glGenBuffers( 1, &mesh->vbo );
     glBindBuffer( GL_ARRAY_BUFFER, mesh->vbo );
     
@@ -255,11 +245,8 @@ bool32_t CreateMesh( Mesh* mesh )
 
     glBindBuffer( GL_ARRAY_BUFFER, 0 );
     glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
-#ifdef _WIN32
-    glBindVertexArray( 0 );
-#else
-    glBindVertexArrayOES( 0 );
-#endif
+
+    BIND_VERTEX_ARRAY( 0 );
     
     mesh->size = 0;
     return true;
@@ -267,11 +254,7 @@ bool32_t CreateMesh( Mesh* mesh )
 
 bool32_t BufferMesh( Mesh* mesh, Vertex* v, int nv, GLuint* i, int ni )
 {
-#ifdef _WIN32
-    glBindVertexArray( mesh->vao );
-#else
-    glBindVertexArrayOES( mesh->vao );
-#endif
+    BIND_VERTEX_ARRAY( mesh->vao );
     
     glBindBuffer( GL_ARRAY_BUFFER, mesh->vbo );
     glBufferData( GL_ARRAY_BUFFER, sizeof(Vertex)*nv, v, GL_STATIC_DRAW );
@@ -281,13 +264,9 @@ bool32_t BufferMesh( Mesh* mesh, Vertex* v, int nv, GLuint* i, int ni )
 
     glBindBuffer( GL_ARRAY_BUFFER, 0 );
     glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
-    
-#ifdef _WIN32
-    glBindVertexArray( 0 );
-#else
-    glBindVertexArrayOES( 0 );
-#endif
 
+    BIND_VERTEX_ARRAY( 0 );
+    
     mesh->size = ni;
 
     return true;
@@ -295,11 +274,8 @@ bool32_t BufferMesh( Mesh* mesh, Vertex* v, int nv, GLuint* i, int ni )
 
 void RenderMesh( Mesh* mesh )
 {
-#ifdef _WIN32
-    glBindVertexArray( mesh->vao );
-#else
-    glBindVertexArrayOES( mesh->vao );
-#endif
+    BIND_VERTEX_ARRAY( mesh->vao );
+    
     glBindBuffer( GL_ARRAY_BUFFER, mesh->vbo );
     glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, mesh->ibo );
     glDrawElements( GL_TRIANGLES, mesh->size, GL_UNSIGNED_INT, 0 );
@@ -337,17 +313,7 @@ bool32_t CreateCamera( Camera* camera )
 {
     camera->position.x = camera->position.y = camera->position.z = 0.0f;
 
-    v2 bounds;
-#ifdef _WIN32
-    bounds.x = WINDOW_W;
-    bounds.y = WINDOW_H;
-#else
-    CGRect br = [[UIScreen mainScreen] bounds];
-    bounds.x = br.size.width;
-    bounds.y = br.size.height;
-#endif
-    
-    camera->projection = MATRIX_ORTHO( bounds.x, bounds.y );
+    camera->projection = MATRIX_ORTHO( (real32_t)WINDOW_W, (real32_t)WINDOW_H );
     camera->view = MATRIX_IDENTITY;
 
     return true;
@@ -363,20 +329,10 @@ v2 ScreenToWorld( v3 world, v2 screen )
     return MAKE_v2( screen.x+world.x, screen.y+world.y );
 }
 
-/*v2 ScreenToWorld( v2 world, v2 screen )
-{
-    return MAKE_v2( screen.x+world.x, screen.y+world.y );
-}*/
-
 v2 WorldToScreen( v3 world, v2 screen )
 {
     return MAKE_v2( screen.x+world.x, screen.y+world.y );
 }
-
-/*v2 WorldToScreen( v2 world, v2 screen )
-{
-    return MAKE_v2( screen.x+world.x, screen.y+world.y );
-}*/
 
 p2 WorldToGrid( v2 world )
 {

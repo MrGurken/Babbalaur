@@ -21,16 +21,6 @@
 #define DIFFUSE_FS_PATH "./shaders/diffuse.fs"
 #define TILESHEET_PATH "./textures/tilesheet.png"
 
-#else
-
-#define DIFFUSE_VS_PATH "diffuse"
-#define DIFFUSE_FS_PATH "diffuse"
-#define TILESHEET_PATH "tilesheet"
-
-#endif
-
-#ifdef _WIN32
-
 #define WINDOW_X SDL_WINDOWPOS_UNDEFINED
 #define WINDOW_Y SDL_WINDOWPOS_UNDEFINED
 #define WINDOW_W 640
@@ -38,10 +28,14 @@
 
 #else
 
+#define DIFFUSE_VS_PATH "diffuse"
+#define DIFFUSE_FS_PATH "diffuse"
+#define TILESHEET_PATH "tilesheet"
+
 #define WINDOW_X 32
 #define WINDOW_Y 32
-#define WINDOW_W 640
-#define WINDOW_H 960
+#define WINDOW_W 320
+#define WINDOW_H 480
 
 #endif
 
@@ -176,13 +170,13 @@ typedef struct MachineTag
 
 typedef struct GamestateTag
 {
-	Mesh quadMesh;
-	Shader shader;
-	Camera camera;
-	Texture texture;
+    Mesh quadMesh;
+    Shader shader;
+    Camera camera;
+    Texture texture;
     uint8_t map[GAME_MAP_HEIGHT*GAME_MAP_WIDTH];
-	Machine machines[GAME_MAP_HEIGHT*GAME_MAP_WIDTH];
-	Memory memory;
+    Machine machines[GAME_MAP_HEIGHT*GAME_MAP_WIDTH];
+    Memory memory;
 } Gamestate;
 
 bool32_t GameInit( Memory* memory );

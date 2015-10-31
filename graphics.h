@@ -12,10 +12,16 @@
 #include "GL\glew.h"
 #include "windows.h"
 
+#define GEN_VERTEX_ARRAYS( n, ptr ) glGenVertexArrays( n, ptr )
+#define BIND_VERTEX_ARRAY( vao ) glBindVertexArray( vao )
+
 #else
 
 #import <GLKit/GLKit.h>
 #import <OpenGLES/ES2/glext.h>
+
+#define GEN_VERTEX_ARRAYS( n, ptr ) glGenVertexArraysOES( n, ptr )
+#define BIND_VERTEX_ARRAY( vao ) glBindVertexArrayOES( vao )
 
 #endif
 
