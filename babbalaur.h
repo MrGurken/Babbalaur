@@ -9,13 +9,8 @@
 
 #include <stdio.h>
 #include <stdint.h>
-#include "maths.h"
-#include "graphics.h"
 
 #if _WIN32
-#include <fstream>
-#include "SDL.h"
-#include "SDL_image.h"
 
 #define DIFFUSE_VS_PATH "./shaders/diffuse.vs"
 #define DIFFUSE_FS_PATH "./shaders/diffuse.fs"
@@ -40,8 +35,8 @@
 
 #define WINDOW_X 32
 #define WINDOW_Y 32
-#define WINDOW_W 640
-#define WINDOW_H 960
+#define WINDOW_W 320
+#define WINDOW_H 480
 
 #endif
 
@@ -76,6 +71,10 @@ typedef struct MemoryTag
     uint32_t size;
 } Memory;
 
+#include "maths.h"
+#include "graphics.h"
+#include "io.h"
+
 enum
 {
     BUTTON_LEFT=0,
@@ -98,44 +97,6 @@ typedef struct InputTag
     bool32_t buttons[MAX_BUTTONS];
     bool32_t keys[MAX_KEYS];
 } Input;
-
-#define SHADER_MAX_UNIFORMS 14
-enum
-{
-    PROJECTION_MATRIX=0,
-    VIEW_MATRIX,
-    MODEL_MATRIX,
-    UV_OFFSET,
-    UV_LENGTH
-};
-
-typedef struct ShaderTag
-{
-    GLuint program;
-    GLuint uniforms[SHADER_MAX_UNIFORMS];
-    int nuniforms;
-} Shader;
-
-typedef struct VertexTag
-{
-    real32_t x, y, z;
-    real32_t u, v;
-} Vertex;
-
-typedef struct TextureTag
-{
-    GLuint id;
-    int width;
-    int height;
-} Texture;
-
-typedef struct MeshTag
-{
-    GLuint vao;
-    GLuint vbo;
-    GLuint ibo;
-    int size;
-} Mesh;
 
 typedef struct CameraTag
 {
@@ -176,13 +137,13 @@ typedef struct MachineTag
 
 typedef struct GamestateTag
 {
-	Mesh quadMesh;
-	Shader shader;
-	Camera camera;
-	Texture texture;
+    Mesh quadMesh;
+    Shader shader;
+    Camera camera;
+    Texture texture;
     uint8_t map[GAME_MAP_HEIGHT*GAME_MAP_WIDTH];
-	Machine machines[GAME_MAP_HEIGHT*GAME_MAP_WIDTH];
-	Memory memory;
+    Machine machines[GAME_MAP_HEIGHT*GAME_MAP_WIDTH];
+    Memory memory;
 } Gamestate;
 
 bool32_t GameInit( Memory* memory );
