@@ -8,10 +8,13 @@
 
 #include "babbalaur.m"
 #include "SDL.h"
+#include "SDL_ttf.h"
 
 int main( int argc, char* argv[] )
 {
     if( SDL_Init( SDL_INIT_EVERYTHING ) < 0 )
+        return -1;
+    if( TTF_Init() < 0 )
         return -1;
     
     SDL_Window* window = SDL_CreateWindow( WINDOW_TITLE,
@@ -109,6 +112,8 @@ int main( int argc, char* argv[] )
         SDL_GL_DeleteContext( context );
     }
 
+    TTF_Quit();
+    
     SDL_DestroyWindow( window );
     SDL_Quit();
 

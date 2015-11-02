@@ -16,10 +16,12 @@
 #include <fstream>
 #include "SDL.h"
 #include "SDL_image.h"
+#include "SDL_ttf.h"
 
 #define DIFFUSE_VS_PATH "./shaders/diffuse.vs"
 #define DIFFUSE_FS_PATH "./shaders/diffuse.fs"
 #define TILESHEET_PATH "./textures/tilesheet.png"
+#define FONT_PATH "C:/windows/fonts/verdana.ttf"
 
 #define WINDOW_X SDL_WINDOWPOS_UNDEFINED
 #define WINDOW_Y SDL_WINDOWPOS_UNDEFINED
@@ -123,6 +125,16 @@ typedef struct TextureTag
     int height;
 } Texture;
 
+#define FONT_MAX_GLYPHS 128
+#define FONT_ASCII_MIN 31 // 32 = space
+#define FONT_ASCII_MAX 128
+typedef struct FontTag
+{
+    Texture glyphs[FONT_MAX_GLYPHS];
+    uint8_t kerning[FONT_MAX_GLYPHS*FONT_MAX_GLYPHS]; // 2d matrix
+    int size;
+} Font;
+
 typedef struct MeshTag
 {
     GLuint vao;
@@ -174,6 +186,7 @@ typedef struct GamestateTag
     Shader shader;
     Camera camera;
     Texture texture;
+    Font font;
     uint8_t map[GAME_MAP_HEIGHT*GAME_MAP_WIDTH];
     Machine machines[GAME_MAP_HEIGHT*GAME_MAP_WIDTH];
     Memory memory;

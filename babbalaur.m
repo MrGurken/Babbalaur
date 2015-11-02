@@ -98,6 +98,20 @@ bool32_t ReadFile( const char* file, const char* fileType, Memory* memory )
 }
 #endif
 
+void MemTexture( Texture* texture, int w, int h, void* pixels, GLenum format )
+{    
+    glGenTextures( 1, &texture->id );
+    glBindTexture( GL_TEXTURE_2D, texture->id );
+    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+    glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, format, GL_UNSIGNED_BYTE, pixels );
+
+    texture->width = w;
+    texture->height = h;
+}
+
 #ifdef _WIN32
 bool32_t LoadTexture( Texture* texture, const char* file )
 {
@@ -107,16 +121,7 @@ bool32_t LoadTexture( Texture* texture, const char* file )
     if( img )
     {
         GLenum format = ( img->format->BytesPerPixel == 4 ? GL_RGBA : GL_RGB );
-        glGenTextures( 1, &texture->id );
-        glBindTexture( GL_TEXTURE_2D, texture->id );
-        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
-        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
-        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
-        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
-        glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, img->w, img->h, 0, format, GL_UNSIGNED_BYTE, img->pixels );
-
-        texture->width = img->w;
-        texture->height = img->h;
+        MemTexture( texture, img->w, img->h, img->pixels, format );
         SDL_FreeSurface( img );
         result = true;
     }
@@ -148,6 +153,66 @@ void UnloadTexture( Texture* texture )
     texture->id = 0;
     texture->width = texture->height = 0;
 }
+
+#ifdef _WIN32
+bool32_t LoadFont( Font* font, const char* file, int size )
+{
+    bool32_t result = false;
+
+    TTF_Font* sdlFont = TTF_OpenFont( file, size );
+    if( sdlFont )
+    {
+        int glyphsGenerated = 0;
+        SDL_Color white = { 255, 255, 255 };
+        
+        for( int i=0; i<FONT_MAX_GLYPHS; i++ )
+        {
+            char buf[2] = { (char)i, 0 }; // have to be null terminated
+            SDL_Surface* pre = TTF_RenderText_Solid( sdlFont, buf, white );
+
+            if( pre )
+            {
+                SDL_Surface* post = SDL_CreateRGBSurface( 0, pre->w, pre->h, 32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000 );
+                SDL_BlitSurface( pre, 0, post, 0 );
+
+                if( post )
+                {
+                    MemTexture( &font->glyphs[i], post->w, post->h, post->pixels, GL_RGBA );
+
+                    // TODO: Retrieve kerning from OS
+                
+                    glyphsGenerated++;
+                    SDL_FreeSurface( post );
+                }
+                
+                SDL_FreeSurface( pre );
+                pre = 0;
+            }
+        }
+        
+        TTF_CloseFont( sdlFont );
+
+        if( glyphsGenerated > 32 )
+        {
+            result = true;
+            font->size = size;
+
+            // TODO: Remove this once we have working kerning
+            for( int i=0; i<FONT_MAX_GLYPHS*FONT_MAX_GLYPHS; i++ )
+                font->kerning[i] = 0;
+        }
+    }
+    
+    return result;
+}
+
+void UnloadFont( Font* font )
+{
+    for( int i=0; i<FONT_MAX_GLYPHS; i++ )
+        UnloadTexture( &font->glyphs[i] );
+}
+#else
+#endif
 
 bool32_t CreateShader( Shader* shader )
 {
@@ -279,6 +344,47 @@ void RenderMesh( Mesh* mesh )
     glBindBuffer( GL_ARRAY_BUFFER, mesh->vbo );
     glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, mesh->ibo );
     glDrawElements( GL_TRIANGLES, mesh->size, GL_UNSIGNED_INT, 0 );
+}
+
+int GetKerning( Font* font, char a, char b )
+{
+    return ( font->kerning[a*FONT_MAX_GLYPHS+b] );
+}
+
+void RenderText( Shader* shader, Mesh* quadMesh, Font* font, const char* text, v2 position )
+{
+    v2 offset = MAKE_v2( 0, 0 );
+    int len = strlen( text );
+    for( int i=0; i<len; i++ )
+    {
+        Texture* glyph = &font->glyphs[text[i]];
+        
+        if( text[i] > FONT_ASCII_MIN && text[i] < FONT_ASCII_MAX )
+        {
+            m4 modelMatrix = MATRIX_MULTIPLY( MATRIX_TRANSLATION( position.x+offset.x, position.y+offset.y, 0 ), MATRIX_SCALE( glyph->width, glyph->height, 1.0f ) );
+            glUniformMatrix4fv( shader->uniforms[MODEL_MATRIX], 1, GL_FALSE, MATRIX_VALUE(modelMatrix) );
+            glUniform2f( shader->uniforms[UV_OFFSET], 0.0f, 0.0f );
+            glUniform1f( shader->uniforms[UV_LENGTH], 1.0f );
+
+            glBindTexture( GL_TEXTURE_2D, glyph->id );
+
+            RenderMesh( quadMesh );
+        }
+
+        if( text[i] == '\n' )
+        {
+            offset.x = 0;
+            offset.y += font->size;
+        }
+        else
+        {
+            offset.x += glyph->width;
+            if( i < len-1 )
+            {
+                offset.x += GetKerning( font, text[i], text[i+1] );
+            }
+        }
+    }
 }
 
 v2 GetTileOffset( uint8_t id )
@@ -469,7 +575,7 @@ bool32_t GameInit( Memory* memory )
     g->memory.size = memory->size - stateSize;
     g->memory.pointer = (uint8_t*)memory->pointer + stateSize;
     
-    printf( "Available memory %d, used %d, temp %d.\n", memory->size, stateSize, g->memory.size );
+    printf( "Allocated memory %d, used %d, temp %d.\n", memory->size, stateSize, g->memory.size );
 
     Vertex quadVertices[] =
         {
@@ -509,6 +615,8 @@ bool32_t GameInit( Memory* memory )
 
     if( !LoadTexture( &g->texture, TILESHEET_PATH ) )
         result = false;
+    if( !LoadFont( &g->font, FONT_PATH, 24 ) )
+        result = false;
 
     for( int y=0; y<GAME_MAP_HEIGHT; y++ )
     {
@@ -523,6 +631,9 @@ bool32_t GameInit( Memory* memory )
             }
         }
     }
+
+    glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
+    glEnable( GL_BLEND );
     
     return result;
 }
@@ -567,4 +678,6 @@ void GameRender( Memory* memory )
             RenderMachine( &g->shader, &g->quadMesh, &g->machines[TILE_INDEX(x,y)], MAKE_v2( x*TILE_SIZE, y*TILE_SIZE ) );
         }
     }
+
+    RenderText( &g->shader, &g->quadMesh, &g->font, "Testing...", MAKE_v2( 32, 32 ) );
 }
