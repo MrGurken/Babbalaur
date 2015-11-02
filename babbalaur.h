@@ -33,6 +33,7 @@
 #define DIFFUSE_VS_PATH "diffuse"
 #define DIFFUSE_FS_PATH "diffuse"
 #define TILESHEET_PATH "tilesheet"
+#define FONT_PATH "verdana"
 
 #define WINDOW_X 32
 #define WINDOW_Y 32

@@ -205,14 +205,25 @@ bool32_t LoadFont( Font* font, const char* file, int size )
     
     return result;
 }
+#else
+bool32_t LoadFont( Font* font, const char* file, int size )
+{
+	// NOTE: The filetype is assumed to be .ttf (TrueType Font)
+	
+	bool32_t result = false;
+	
+	NSString* texturePath = [[NSBundle mainBundle] pathForResource:[NSString stringWithUTF8String:file] ofType:@"ttf"];
+	NSError* theError;
+	
+	return result;
+}
+#endif
 
 void UnloadFont( Font* font )
 {
-    for( int i=0; i<FONT_MAX_GLYPHS; i++ )
-        UnloadTexture( &font->glyphs[i] );
+	for( int i=0; i<FONT_MAX_GLYPHS; i++ )
+		UnloadTexture( &font->glyphs[i] );
 }
-#else
-#endif
 
 bool32_t CreateShader( Shader* shader )
 {
@@ -353,13 +364,16 @@ int GetKerning( Font* font, char a, char b )
 
 void RenderText( Shader* shader, Mesh* quadMesh, Font* font, const char* text, v2 position )
 {
+	char minChar = (char)FONT_ASCII_MIN;
+	char maxChar = (char)FONT_ASCII_MAX;
+	
     v2 offset = MAKE_v2( 0, 0 );
     int len = strlen( text );
     for( int i=0; i<len; i++ )
     {
         Texture* glyph = &font->glyphs[text[i]];
-        
-        if( text[i] > FONT_ASCII_MIN && text[i] < FONT_ASCII_MAX )
+		
+        if( text[i] > minChar && text[i] < maxChar )
         {
             m4 modelMatrix = MATRIX_MULTIPLY( MATRIX_TRANSLATION( position.x+offset.x, position.y+offset.y, 0 ), MATRIX_SCALE( glyph->width, glyph->height, 1.0f ) );
             glUniformMatrix4fv( shader->uniforms[MODEL_MATRIX], 1, GL_FALSE, MATRIX_VALUE(modelMatrix) );
