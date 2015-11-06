@@ -21,7 +21,10 @@
 #define DIFFUSE_VS_PATH "./shaders/diffuse.vs"
 #define DIFFUSE_FS_PATH "./shaders/diffuse.fs"
 #define TILESHEET_PATH "./textures/tilesheet.png"
-#define FONT_PATH "C:/windows/fonts/verdana.ttf"
+#define TILESHEET_NAME "Tilesheet"
+#define FONT_TEXTURE_PATH "./fonts/verdana24.png"
+#define FONT_INFO_PATH "./fonts/verdana24.txt"
+#define FONT_NAME "Verdana24"
 
 #define WINDOW_X SDL_WINDOWPOS_UNDEFINED
 #define WINDOW_Y SDL_WINDOWPOS_UNDEFINED
@@ -33,7 +36,10 @@
 #define DIFFUSE_VS_PATH "diffuse"
 #define DIFFUSE_FS_PATH "diffuse"
 #define TILESHEET_PATH "tilesheet"
-#define FONT_PATH "verdana"
+#define TILESHEET_NAME "Tilesheet"
+#define FONT_TEXTURE_PATH "verdana24"
+#define FONT_INFO_PATH "verdana24"
+#define FONT_NAME "Verdana24"
 
 #define WINDOW_X 32
 #define WINDOW_Y 32
@@ -103,7 +109,8 @@ enum
     VIEW_MATRIX,
     MODEL_MATRIX,
     UV_OFFSET,
-    UV_LENGTH
+    UV_LENGTH,
+    COLOR
 };
 
 typedef struct ShaderTag
@@ -126,15 +133,33 @@ typedef struct TextureTag
     int height;
 } Texture;
 
-#define FONT_MAX_GLYPHS 128
-#define FONT_ASCII_MIN 31 // 32 = space
-#define FONT_ASCII_MAX 128
+#define FONT_ASCII_MIN 33 // 32 = SPACE
+#define FONT_ASCII_MAX 127 // 127 = DEL
+#define FONT_ASCII_RANGE (FONT_ASCII_MAX-FONT_ASCII_MIN) // 96
+#define FONT_GLYPHS_PER_ROW 10
 typedef struct FontTag
 {
-    Texture glyphs[FONT_MAX_GLYPHS];
-    uint8_t kerning[FONT_MAX_GLYPHS*FONT_MAX_GLYPHS]; // 2d matrix
-    int size;
+    Texture* texture;
+    uint8_t size;
+    uint8_t ascent;
+    uint8_t descent;
+    uint8_t lineskip;
+    uint8_t linespace;
+    uint8_t advance[FONT_ASCII_RANGE];
 } Font;
+
+#define ASSETS_MAX_TEXTURES 16
+#define ASSETS_MAX_FONTS 4
+#define ASSETS_MAX_NAME 32
+typedef struct AssetsTag
+{
+    Texture textures[ASSETS_MAX_TEXTURES];
+    char textureNames[ASSETS_MAX_TEXTURES][ASSETS_MAX_NAME];
+    int ntextures;
+    Font fonts[ASSETS_MAX_FONTS];
+    char fontNames[ASSETS_MAX_FONTS][ASSETS_MAX_NAME];
+    int nfonts;
+} Assets;
 
 typedef struct MeshTag
 {
@@ -181,15 +206,32 @@ typedef struct MachineTag
     int type;
 } Machine;
 
+#define REGION_MAX_CHILDREN 8
+typedef struct UIRegionTag
+{
+    v2 position;
+    v2 bounds;
+    bool32_t isDown;
+    bool32_t wasDown;
+    Texture* background;
+
+    UIRegionTag* parent;
+    UIRegionTag* children[REGION_MAX_CHILDREN];
+    int nchildren;
+} UIRegion;
+
 typedef struct GamestateTag
 {
     Mesh quadMesh;
     Shader shader;
     Camera camera;
-    Texture texture;
-    Font font;
+    Assets assets;
+    Texture* texture;
+    Font* font;
     uint8_t map[GAME_MAP_HEIGHT*GAME_MAP_WIDTH];
     Machine machines[GAME_MAP_HEIGHT*GAME_MAP_WIDTH];
+    UIRegion region;
+    UIRegion childRegion;
     Memory memory;
 } Gamestate;
 

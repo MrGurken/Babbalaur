@@ -8,6 +8,12 @@
 
 #include "babbalaur.h"
 
+bool32_t Contains( v2 position, v2 bounds, v2 point )
+{
+    return ( point.x >= position.x && point.y >= position.y &&
+             point.x <= (position.x+bounds.x) && point.y <= (position.y+bounds.y) );
+}
+
 bool32_t ButtonDown( Input* input, int index )
 {
     return input->buttons[index];
@@ -54,6 +60,14 @@ bool32_t KeyReleased( Input* newInput, Input* oldInput, int index )
     if( KeyDown( newInput, index ) )
         return false;
     return KeyDown( oldInput, index );
+}
+
+bool32_t CreateAssets( Assets* assets )
+{
+    assets->ntextures = 0;
+    assets->nfonts = 0;
+
+    return true;
 }
 
 #ifdef _WIN32
@@ -113,34 +127,55 @@ void MemTexture( Texture* texture, int w, int h, void* pixels, GLenum format )
 }
 
 #ifdef _WIN32
-bool32_t LoadTexture( Texture* texture, const char* file )
+Texture* LoadTexture( Assets* assets, const char* file, const char* name )
 {
-    bool32_t result = false;
+    Texture* result = 0;
 
-    SDL_Surface* img = IMG_Load( file );
-    if( img )
+    for( int i=0; i<assets->ntextures && result == 0; i++ )
+        if( strncmp( assets->textureNames[i], name, ASSETS_MAX_NAME ) == 0 )
+            result = &assets->textures[i];
+
+    if( result == 0 && assets->ntextures < ASSETS_MAX_TEXTURES )
     {
-        GLenum format = ( img->format->BytesPerPixel == 4 ? GL_RGBA : GL_RGB );
-        MemTexture( texture, img->w, img->h, img->pixels, format );
-        SDL_FreeSurface( img );
-        result = true;
-    }
+        SDL_Surface* img = IMG_Load( file );
+        if( img )
+        {
+            result = &assets->textures[assets->ntextures];
+            strncpy( assets->textureNames[assets->ntextures], name, ASSETS_MAX_NAME );            
+            assets->ntextures++;
 
+            GLenum format = ( img->format->BytesPerPixel == 4 ? GL_RGBA : GL_RGB );
+            MemTexture( result, img->w, img->h, img->pixels, format );
+            SDL_FreeSurface( img );
+        }
+    }
+    
     return result;
 }
 #else
-bool32_t LoadTexture( Texture* texture, const char* file )
+Texture* LoadTexture( Assets* assets, const char* file, const char* name )
 {
-    bool32_t result = false;
-    
-    NSString* texturePath = [[NSBundle mainBundle] pathForResource:[NSString stringWithUTF8String:file] ofType:@"png"];
-    NSError* theError;
-    GLKTextureInfo* info = [GLKTextureLoader textureWithContentsOfFile:texturePath options:nil error:&theError];
-    
-    texture->id = info.name;
-    texture->width = info.width;
-    texture->height = info.height;
-    
+    Texture* result = 0;
+
+    for( int i=0; i<assets->ntextures && result == 0; i++ )
+        if( strncmp( assets->textureNames[i], name, ASSETS_MAX_NAME ) )
+            result = &assets->textures[i];
+
+    if( result == 0 && assets->ntextures < ASSETS_MAX_TEXTURES )
+    {
+        result = &assets->textures[assets->ntextures];
+        strncpy( assets->texturesNames[assets->ntextures], name, ASSETS_MAX_NAME );
+        assets->ntextures++;
+        
+        NSString* texturePath = [[NSBundle mainBundle] pathForResource:[NSString stringWithUTF8String:file] ofType:@"png"];
+        NSError* theError;
+        GLKTextureInfo* info = [GLKTextureLoader textureWithContentsOfFile:texturePath options:nil error:&theError];
+
+        result->id = info.name;
+        result->width = info.width;
+        result->height = info.height;
+    }
+
     return result;
 }
 #endif
@@ -155,74 +190,84 @@ void UnloadTexture( Texture* texture )
 }
 
 #ifdef _WIN32
-bool32_t LoadFont( Font* font, const char* file, int size )
+Font* LoadFont( Assets* assets, const char* texture, const char* info, const char* name )
 {
-    bool32_t result = false;
+    Font* result = 0;
 
-    TTF_Font* sdlFont = TTF_OpenFont( file, size );
-    if( sdlFont )
+    for( int i=0; i<assets->nfonts && result == 0; i++ )
+        if( strncmp( assets->fontNames[i], name, ASSETS_MAX_NAME ) == 0 )
+            result = &assets->fonts[i];
+
+    if( result == 0 && assets->nfonts < ASSETS_MAX_FONTS )
     {
-        int glyphsGenerated = 0;
-        SDL_Color white = { 255, 255, 255 };
-        
-        for( int i=0; i<FONT_MAX_GLYPHS; i++ )
+        result = &assets->fonts[assets->nfonts];
+        strncpy( assets->fontNames[assets->nfonts], name, ASSETS_MAX_NAME );
+        assets->nfonts++;
+
+        result->texture = LoadTexture( assets, texture, name );
+
+        if( result->texture )
         {
-            char buf[2] = { (char)i, 0 }; // have to be null terminated
-            SDL_Surface* pre = TTF_RenderText_Solid( sdlFont, buf, white );
-
-            if( pre )
+            std::ifstream stream( info, std::ios::in | std::ios::binary );
+            if( stream.is_open() )
             {
-                SDL_Surface* post = SDL_CreateRGBSurface( 0, pre->w, pre->h, 32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000 );
-                SDL_BlitSurface( pre, 0, post, 0 );
+                char buf[5] = {};
+                stream.read( buf, 5 );
 
-                if( post )
-                {
-                    MemTexture( &font->glyphs[i], post->w, post->h, post->pixels, GL_RGBA );
+                result->size = buf[0];
+                result->ascent = buf[1];
+                result->descent = buf[2];
+                result->lineskip = buf[3];
+                result->linespace = buf[4];
 
-                    // TODO: Retrieve kerning from OS
-                
-                    glyphsGenerated++;
-                    SDL_FreeSurface( post );
-                }
-                
-                SDL_FreeSurface( pre );
-                pre = 0;
+                stream.read( (char*)(&result->advance), FONT_ASCII_RANGE );
+                stream.close();
             }
         }
-        
-        TTF_CloseFont( sdlFont );
-
-        if( glyphsGenerated > 32 )
+        else
         {
-            result = true;
-            font->size = size;
-
-            // TODO: Remove this once we have working kerning
-            for( int i=0; i<FONT_MAX_GLYPHS*FONT_MAX_GLYPHS; i++ )
-                font->kerning[i] = 0;
+            assets->nfonts--;
+            result = 0;
         }
     }
-    
+
     return result;
 }
 #else
 bool32_t LoadFont( Font* font, const char* file, int size )
 {
-	// NOTE: The filetype is assumed to be .ttf (TrueType Font)
-	
-	bool32_t result = false;
-	
-	NSString* texturePath = [[NSBundle mainBundle] pathForResource:[NSString stringWithUTF8String:file] ofType:@"ttf"];
-	NSError* theError;
-	
-	return result;
+    // NOTE: The filetype is assumed to be .ttf (TrueType Font)
+    
+    bool32_t result = false;
+    
+    NSString* texturePath = [[NSBundle mainBundle] pathForResource:[NSString stringWithUTF8String:file] ofType:@"ttf"];
+    NSError* theError;
+    
+    return result;
 }
 #endif
 
-void UnloadFont( Font* font )
+v2 TextSize( Font* font, const char* text )
 {
-	for( int i=0; i<FONT_MAX_GLYPHS; i++ )
-		UnloadTexture( &font->glyphs[i] );
+    v2 result = MAKE_v2( 0, 0 );
+    real32_t width = 0.0f;
+
+    const char* c = text;
+    while( c != 0 )
+    {
+        if( *c == '\n' )
+        {
+            if( width > result.x )
+                result.x = width;
+            width = 0.0f;
+            result.y += font->lineskip;
+            c++;
+        }
+        else
+            result.x += font->advance[*c++];
+    }
+
+    return result;
 }
 
 bool32_t CreateShader( Shader* shader )
@@ -357,45 +402,45 @@ void RenderMesh( Mesh* mesh )
     glDrawElements( GL_TRIANGLES, mesh->size, GL_UNSIGNED_INT, 0 );
 }
 
-int GetKerning( Font* font, char a, char b )
+void RenderText( Shader* shader, Mesh* quadMesh, Font* font, const char* text, v2 position, v4 color )
 {
-    return ( font->kerning[a*FONT_MAX_GLYPHS+b] );
-}
-
-void RenderText( Shader* shader, Mesh* quadMesh, Font* font, const char* text, v2 position )
-{
-	char minChar = (char)FONT_ASCII_MIN;
-	char maxChar = (char)FONT_ASCII_MAX;
-	
     v2 offset = MAKE_v2( 0, 0 );
     int len = strlen( text );
     for( int i=0; i<len; i++ )
     {
-        Texture* glyph = &font->glyphs[text[i]];
-		
-        if( text[i] > minChar && text[i] < maxChar )
+        int index = text[i] - FONT_ASCII_MIN;
+        if( index >= 0 && index < FONT_ASCII_RANGE )
         {
-            m4 modelMatrix = MATRIX_MULTIPLY( MATRIX_TRANSLATION( position.x+offset.x, position.y+offset.y, 0 ), MATRIX_SCALE( glyph->width, glyph->height, 1.0f ) );
-            glUniformMatrix4fv( shader->uniforms[MODEL_MATRIX], 1, GL_FALSE, MATRIX_VALUE(modelMatrix) );
-            glUniform2f( shader->uniforms[UV_OFFSET], 0.0f, 0.0f );
-            glUniform1f( shader->uniforms[UV_LENGTH], 1.0f );
+            real32_t glyphSize = (real32_t)font->size / (real32_t)font->texture->width;
+        
+            v2 glyphOffset = MAKE_v2( ( index % FONT_GLYPHS_PER_ROW ) * glyphSize,
+                                      ( index / FONT_GLYPHS_PER_ROW ) * glyphSize );
 
-            glBindTexture( GL_TEXTURE_2D, glyph->id );
+            v2 pos = MAKE_v2( position.x+offset.x, position.y+offset.y );
+    
+            m4 modelMatrix = MATRIX_MULTIPLY( MATRIX_TRANSLATION( pos.x, pos.y, 0.0f ),
+                                              MATRIX_SCALE( font->size, font->size, 1.0f ) );
+            glUniformMatrix4fv( shader->uniforms[MODEL_MATRIX], 1, GL_FALSE, MATRIX_VALUE(modelMatrix) );
+            glUniform2f( shader->uniforms[UV_OFFSET], glyphOffset.x, glyphOffset.y );
+            glUniform1f( shader->uniforms[UV_LENGTH], glyphSize );
+            glUniform4f( shader->uniforms[COLOR], color.r, color.g, color.b, color.a );
+
+            glBindTexture( GL_TEXTURE_2D, font->texture->id );
 
             RenderMesh( quadMesh );
-        }
 
-        if( text[i] == '\n' )
-        {
-            offset.x = 0;
-            offset.y += font->size;
+            offset.x += font->advance[index];
         }
         else
         {
-            offset.x += glyph->width;
-            if( i < len-1 )
+            if( text[i] == '\n' )
             {
-                offset.x += GetKerning( font, text[i], text[i+1] );
+                offset.x = 0.0f;
+                offset.y += font->lineskip;
+            }
+            else if( text[i] == ' ' )
+            {
+                offset.x += font->linespace;
             }
         }
     }
@@ -420,7 +465,8 @@ void RenderTile( Shader* shader, Mesh* mesh, uint8_t id, v2 position )
     {
         v2 tileOffset = GetTileOffset( id );
         
-        m4 modelMatrix = MATRIX_MULTIPLY( MATRIX_TRANSLATION( position.x, position.y, 0.0f ), MATRIX_SCALE( TILE_SIZE, TILE_SIZE, 1.0f ) );
+        m4 modelMatrix = MATRIX_MULTIPLY( MATRIX_TRANSLATION( position.x, position.y, 0.0f ),
+                                          MATRIX_SCALE( TILE_SIZE, TILE_SIZE, 1.0f ) );
         glUniformMatrix4fv( shader->uniforms[MODEL_MATRIX], 1, GL_FALSE, MATRIX_VALUE(modelMatrix) );
         glUniform2f( shader->uniforms[UV_OFFSET], tileOffset.x, tileOffset.y );
         glUniform1f( shader->uniforms[UV_LENGTH], TILE_UV_LENGTH );
@@ -580,6 +626,111 @@ void RenderMachine( Shader* shader, Mesh* mesh, Machine* machine, v2 position )
     }
 }
 
+bool32_t CreateUIRegion( UIRegion* region, real32_t x, real32_t y, real32_t w, real32_t h )
+{
+    region->position.x = x;
+    region->position.y = y;
+    region->bounds.x = w;
+    region->bounds.y = h;
+    region->isDown = false;
+    region->wasDown = false;
+    region->background = 0;
+    region->nchildren = 0;
+    region->background = 0;
+
+    return true;
+}
+
+bool32_t AddChild( UIRegion* parent, UIRegion* child )
+{
+    bool32_t result = false;
+    
+    if( parent->nchildren < REGION_MAX_CHILDREN )
+    {
+        parent->children[parent->nchildren++] = child;
+        child->parent = parent;
+        result = true;
+    }
+
+    return result;
+}
+
+void RemoveChild( UIRegion* parent, int index )
+{
+    // NOTE: Swap the last item with the index. Then decrease the number of children
+    if( index >= 0 && index < parent->nchildren )
+    {
+        parent->children[index]->parent = 0;
+        parent->children[index] = parent->children[--parent->nchildren];
+    }
+}
+
+bool32_t RemoveChild( UIRegion* parent, UIRegion* child )
+{
+    bool32_t result = false;
+
+    for( int i=0; i<parent->nchildren && !result; i++ )
+    {
+        if( parent->children[i] == child )
+        {
+            RemoveChild( parent, i );
+            result = true;
+        }
+    }
+
+    return result;
+}
+
+bool32_t UIRegionPressed( UIRegion* region )
+{
+    if( region->wasDown )
+        return false;
+    return region->isDown;
+}
+
+bool32_t UIRegionReleased( UIRegion* region )
+{
+    if( region->isDown )
+        return false;
+    return region->wasDown;
+}
+
+void UpdateUIRegion( UIRegion* region, Input* newInput, Input* oldInput, v2 offset = MAKE_v2( 0, 0 ) )
+{
+    region->wasDown = region->isDown;
+    
+    v2 position = MAKE_v2( region->position.x+offset.x, region->position.y+offset.y );
+    region->isDown = ( ButtonDown( newInput, BUTTON_LEFT ) &&
+                       Contains( position, region->bounds, newInput->mousePosition ) );;
+
+    for( int i=0; i<region->nchildren; i++ )
+        UpdateUIRegion( region->children[i], newInput, oldInput, position );
+}
+
+void RenderUIRegion( Shader* shader, Mesh* mesh, UIRegion* region, v2 offset = MAKE_v2( 0, 0 ) )
+{
+    m4 viewMatrix = MATRIX_IDENTITY;
+    glUniformMatrix4fv( shader->uniforms[VIEW_MATRIX], 1, GL_FALSE, MATRIX_VALUE( viewMatrix ) );
+
+    v2 position = region->position;
+    position.x += offset.x;
+    position.y += offset.y;
+    
+    m4 modelMatrix = MATRIX_MULTIPLY( MATRIX_TRANSLATION( position.x, position.y, 0.0f ),
+                                      MATRIX_SCALE( region->bounds.x, region->bounds.y, 1.0f ) );
+    glUniformMatrix4fv( shader->uniforms[MODEL_MATRIX], 1, GL_FALSE, MATRIX_VALUE(modelMatrix) );
+
+    glUniform2f( shader->uniforms[UV_OFFSET], 0.0f, 0.0f );
+    glUniform1f( shader->uniforms[UV_LENGTH], 1.0f );
+
+    //glBindTexture( GL_TEXTURE_2D, region->background->id );
+
+    RenderMesh( mesh );
+
+    for( int i=0; i<region->nchildren; i++ )
+        RenderUIRegion( shader, mesh, region->children[i], position );
+}
+
 bool32_t GameInit( Memory* memory )
 {
     bool32_t result = true;
@@ -623,14 +774,26 @@ bool32_t GameInit( Memory* memory )
     AddUniform( &g->shader, "ModelMatrix" );
     AddUniform( &g->shader, "UVOffset" );
     AddUniform( &g->shader, "UVLength" );
+    AddUniform( &g->shader, "Color" );
 
     if( !CreateCamera( &g->camera ) )
         result = false;
 
-    if( !LoadTexture( &g->texture, TILESHEET_PATH ) )
+    if( !CreateAssets( &g->assets ) )
         result = false;
-    if( !LoadFont( &g->font, FONT_PATH, 24 ) )
-        result = false;
+    else
+    {
+        /*if( !LoadTexture( &g->assets, TILESHEET_PATH, TILESHEET_NAME ) )
+            result = false;
+        if( !LoadFont( &g->assets, FONT_TEXTURE_PATH, FONT_INFO_PATH, FONT_NAME ) )
+        result = false;*/
+
+        g->texture = LoadTexture( &g->assets, TILESHEET_PATH, TILESHEET_NAME );
+        g->font = LoadFont( &g->assets, FONT_TEXTURE_PATH, FONT_INFO_PATH, FONT_NAME );
+
+        if( !g->texture || !g->font )
+            result = false;
+    }
 
     for( int y=0; y<GAME_MAP_HEIGHT; y++ )
     {
@@ -645,6 +808,12 @@ bool32_t GameInit( Memory* memory )
             }
         }
     }
+
+    if( !CreateUIRegion( &g->region, 32, 256, 256, 128 ) )
+        result = false;
+    if( !CreateUIRegion( &g->childRegion, 0, 0, 256, 12 ) )
+        result = false;
+    AddChild( &g->region, &g->childRegion );
 
     glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
     glEnable( GL_BLEND );
@@ -668,6 +837,12 @@ bool32_t GameUpdate( Memory* memory, Input* newInput, Input* oldInput, real64_t 
         else
             printf( "Failed to place machine.\n" );
     }
+
+    UpdateUIRegion( &g->region, newInput, oldInput );
+
+    if( UIRegionReleased( &g->childRegion ) )
+        printf( "Titlebar pressed.\n" );
+    
     return true;
 }
 
@@ -675,23 +850,30 @@ void GameRender( Memory* memory )
 {
     Gamestate* g = (Gamestate*)memory->pointer;
     
-    glClearColor( 1.0f, 0.0f, 0.0f, 0.0f );
+    glClearColor( 0.0f, 0.0f, 0.0f, 0.0f );
     glClear( GL_COLOR_BUFFER_BIT );
 
     glUseProgram( g->shader.program );
-    glBindTexture( GL_TEXTURE_2D, g->texture.id );
+    glBindTexture( GL_TEXTURE_2D, g->texture->id );
     
     glUniformMatrix4fv( g->shader.uniforms[PROJECTION_MATRIX], 1, GL_FALSE, MATRIX_VALUE( g->camera.projection ) );
     glUniformMatrix4fv( g->shader.uniforms[VIEW_MATRIX], 1, GL_FALSE, MATRIX_VALUE( g->camera.view ) );
+    glUniform4f( g->shader.uniforms[COLOR], 1.0f, 1.0f, 1.0f, 1.0f );
     
     for( int y=0; y<GAME_MAP_HEIGHT; y++ )
     {
         for( int x=0; x<GAME_MAP_WIDTH; x++ )
         {
-            RenderTile( &g->shader, &g->quadMesh, g->map[TILE_INDEX(x,y)], MAKE_v2( x*TILE_SIZE, y*TILE_SIZE ) );
-            RenderMachine( &g->shader, &g->quadMesh, &g->machines[TILE_INDEX(x,y)], MAKE_v2( x*TILE_SIZE, y*TILE_SIZE ) );
+            //RenderTile( &g->shader, &g->quadMesh, g->map[TILE_INDEX(x,y)], MAKE_v2( x*TILE_SIZE, y*TILE_SIZE ) );
+            //RenderMachine( &g->shader, &g->quadMesh, &g->machines[TILE_INDEX(x,y)], MAKE_v2( x*TILE_SIZE, y*TILE_SIZE ) );
         }
     }
 
-    RenderText( &g->shader, &g->quadMesh, &g->font, "Testing...", MAKE_v2( 32, 32 ) );
+    RenderText( &g->shader, &g->quadMesh, g->font,
+                "Testing...\nMore testing...",
+                MAKE_v2( 0, 0 ),
+                MAKE_v4( 0.0f, 1.0f, 0.0f, 1.0f ) );
+
+    glBindTexture( GL_TEXTURE_2D, g->texture->id );
+    RenderUIRegion( &g->shader, &g->quadMesh, &g->region );
 }

@@ -20,6 +20,7 @@ typedef glm::mat4 m4;
 
 #define MAKE_v2( x, y ) v2( x, y )
 #define MAKE_v3( x, y, z ) v3( x, y, z )
+#define MAKE_v4( x, y, z, w ) v4( x, y, z, w )
 #define MATRIX_VALUE( matrix ) value_ptr( matrix )
 #define MATRIX_IDENTITY m4()
 #define MATRIX_ORTHO( x, y ) glm::ortho( 0.0f, x, y, 0.0f, -1.0f, 1.0f )
@@ -38,6 +39,7 @@ typedef GLKMatrix4 m4;
 
 #define MAKE_v2( x, y ) GLKVector2Make( x, y )
 #define MAKE_v3( x, y, z ) GLKVector3Make( x, y ,z )
+#define MAKE_v4( x, y, z, w ) GLKVector4Make( x, y, z, w )
 #define MATRIX_VALUE( matrix ) matrix.m
 #define MATRIX_IDENTITY GLKMatrix4Identity
 #define MATRIX_ORTHO( x, y ) GLKMatrix4MakeOrtho( 0.0f, x, y, 0.0f, -1.0f, 1.0f )

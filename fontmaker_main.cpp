@@ -18,9 +18,15 @@ using namespace std;
 
 #define ASCII_SPACE 32
 #define ASCII_DEL 127
-#define ASCII_RANGE (ASCII_DEL-ASCII_SPACE) // 96
+#define ASCII_RANGE (ASCII_DEL-ASCII_SPACE-1) // 95
 
 #define CHARS_PER_ROW 10 // 10*10 = 100, we need 96
+
+typedef struct GlyphTag
+{
+    SDL_Surface* surface;
+    uint8_t advance;
+} Glyph;
 
 int main( int argc, char* argv[] )
 {
@@ -53,12 +59,17 @@ int main( int argc, char* argv[] )
             if( font )
             {
                 SDL_Color white = { 255, 255, 255 };
-                SDL_Surface* glyphs[ASCII_RANGE] = {};
+                SDL_Color red = { 255, 0, 0 };
+                Glyph glyphs[ASCII_RANGE] = {};
 
                 for( int i=0; i<ASCII_RANGE; i++ )
                 {
-                    char glyphCharacter[2] = { (char)(i+ASCII_SPACE), 0 };
-                    SDL_Surface* pre = TTF_RenderText_Solid( font, glyphCharacter, white );
+                    char glyphCharacter = (char)(i+ASCII_SPACE+1);
+#if 1
+                    SDL_Surface* pre = TTF_RenderGlyph_Solid( font, glyphCharacter, white );
+#else
+                    SDL_Surface* pre = TTF_RenderGlyph_Solid( font, glyphCharacter, red );
+#endif
 
                     if( pre )
                     {
@@ -67,13 +78,24 @@ int main( int argc, char* argv[] )
 
                         if( post )
                         {
-                            glyphs[i] = post;
+                            int32_t advance;
+                            if( TTF_GlyphMetrics( font, glyphCharacter, 0, 0, 0, 0, &advance ) >= 0 )
+                                glyphs[i].advance = (uint8_t)advance;
+                            glyphs[i].surface = post;
+                            
                             generatedGlyphs++;
                         }
 
                         SDL_FreeSurface( pre );
                     }
                 }
+
+                int ascent = TTF_FontAscent( font );
+                int descent = TTF_FontDescent( font );
+                int lineskip = TTF_FontLineSkip( font );
+
+                int linespace;
+                TTF_GlyphMetrics( font, ' ', 0, 0, 0, 0, &linespace );
             
                 TTF_CloseFont( font );
 
@@ -84,13 +106,13 @@ int main( int argc, char* argv[] )
                     // get max width and height
                     for( int i=0; i<ASCII_RANGE; i++ )
                     {
-                        if( glyphs[i]->w > maxWidth )
-                            maxWidth = glyphs[i]->w;
-                        if( glyphs[i]->h > maxHeight )
-                            maxHeight = glyphs[i]->h;
+                        if( glyphs[i].surface->w > maxWidth )
+                            maxWidth = glyphs[i].surface->w;
+                        if( glyphs[i].surface->h > maxHeight )
+                            maxHeight = glyphs[i].surface->h;
                     }
 
-                    int maxVal = ( maxWidth > maxHeight ? maxWidth : maxHeight );
+                    uint32_t maxVal = ( maxWidth > maxHeight ? maxWidth : maxHeight );
                     int minSize = maxVal * CHARS_PER_ROW;
 
                     int imageSize = 128;
@@ -100,32 +122,36 @@ int main( int argc, char* argv[] )
                     SDL_Surface* img = SDL_CreateRGBSurface( 0, imageSize, imageSize, 32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000 );
                     if( img )
                     {
-                        string name = filename;
-                        size_t dot = name.find( '.' );
-                        name = name.substr( 0, dot );
-                        name = name + string( "_info.txt" );
+                        string name = filename + string(".txt");
                         
-                        ofstream stream( name, ios::out );//| ios::binary );
+                        ofstream stream( name, ios::out | ios::binary );
                         if( stream.is_open() )
                         {
+                            char buf[ASCII_RANGE] = { maxVal, ascent, descent, lineskip, linespace };
+                            stream.write( buf, 5 );
+                            
                             int i=0;
                             for( int y=0; y<CHARS_PER_ROW && i<ASCII_RANGE; y++ )
                             {
                                 for( int x=0; x<CHARS_PER_ROW && i<ASCII_RANGE; x++, i++ )
                                 {
                                     SDL_Rect dst = { x*maxVal, y*maxVal, 0, 0 };
-                                    SDL_BlitSurface( glyphs[i], 0, img, &dst );
+                                    SDL_BlitSurface( glyphs[i].surface, 0, img, &dst );
+                                    
+                                    // NOTE: Don't do this. Don't write 1 byte at a time
+                                    //stream.write( glyphs[i].advance, 1 );
 
-                                    //char buf[2] = { (char)glyphs[i]->w, (char)glyphs[i]->h };
-                                    //stream.write( buf, 2 );
-
-                                    stream << glyphs[i]->w << " " << glyphs[i]->h << " ";
+                                    buf[i] = glyphs[i].advance;
                                 }
                             }
 
+                            // NOTE: This is much better, write all the bytes at the same time
+                            stream.write( buf, ASCII_RANGE );
+
                             stream.close();
 
-                            IMG_SavePNG( img, filename );
+                            string pngname = filename + string(".png");
+                            IMG_SavePNG( img, pngname.c_str() );
 
                             printf( "Font generation completed. %d glyphs generated.\n", generatedGlyphs );
                         }
@@ -135,7 +161,7 @@ int main( int argc, char* argv[] )
                     
                     // free surfaces
                     for( int i=0; i<ASCII_RANGE; i++ )
-                        SDL_FreeSurface( glyphs[i] );
+                        SDL_FreeSurface( glyphs[i].surface );
                 }
                 else
                     printf( "Font generation failed. No glyphs generated.\n" );
