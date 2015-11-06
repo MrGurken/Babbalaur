@@ -158,18 +158,18 @@ Texture* LoadTexture( Assets* assets, const char* file, const char* name )
     Texture* result = 0;
 
     for( int i=0; i<assets->ntextures && result == 0; i++ )
-        if( strncmp( assets->textureNames[i], name, ASSETS_MAX_NAME ) )
+        if( strncmp( assets->textureNames[i], name, ASSETS_MAX_NAME ) == 0 )
             result = &assets->textures[i];
 
     if( result == 0 && assets->ntextures < ASSETS_MAX_TEXTURES )
     {
         result = &assets->textures[assets->ntextures];
-        strncpy( assets->texturesNames[assets->ntextures], name, ASSETS_MAX_NAME );
+        strncpy( assets->textureNames[assets->ntextures], name, ASSETS_MAX_NAME );
         assets->ntextures++;
         
         NSString* texturePath = [[NSBundle mainBundle] pathForResource:[NSString stringWithUTF8String:file] ofType:@"png"];
         NSError* theError;
-        GLKTextureInfo* info = [GLKTextureLoader textureWithContentsOfFile:texturePath options:nil error:&theError];
+		GLKTextureInfo* info = [GLKTextureLoader textureWithContentsOfFile:texturePath options:nil error:&theError];
 
         result->id = info.name;
         result->width = info.width;
@@ -282,15 +282,54 @@ Font* LoadFont( Assets* assets, const char* font, const char* name )
     return result;
 }
 #else
-bool32_t LoadFont( Font* font, const char* file, int size )
+Font* LoadFont( Assets* assets, const char* file, const char* name )
 {
-    // NOTE: The filetype is assumed to be .ttf (TrueType Font)
-    
-    bool32_t result = false;
-    
-    NSString* texturePath = [[NSBundle mainBundle] pathForResource:[NSString stringWithUTF8String:file] ofType:@"ttf"];
-    NSError* theError;
-    
+	Font* result = 0;
+	
+	for( int i=0; i<assets->nfonts; i++ )
+		if( strncmp( assets->fontNames[i], name, ASSETS_MAX_NAME ) == 0 )
+			result = &assets->fonts[i];
+	
+	if( result == 0 && assets->nfonts < ASSETS_MAX_TEXTURES )
+	{
+		NSString* infoPath = [[NSBundle mainBundle] pathForResource:[NSString stringWithUTF8String:file] ofType:@".txt"];
+		NSString* content = [NSString stringWithContentsOfFile:infoPath encoding:NSUTF8StringEncoding error:nil];
+		
+		if( content.length > 0 )
+		{
+			result = &assets->fonts[assets->nfonts];
+			strncpy( assets->fontNames[assets->nfonts], name, ASSETS_MAX_NAME );
+			assets->nfonts++;
+			
+			const char* data = [content UTF8String];
+		
+			// read the path to the font texture
+			char buf[FONT_MAX_PATH] = {};
+			strncpy( buf, data, FONT_MAX_PATH );
+		
+			result->texture = LoadTexture( assets, buf, name );
+		
+			if( result )
+			{
+				// read font attributes
+				data += FONT_MAX_PATH;
+			
+				result->size = *data++;
+				result->lineskip = *data++;
+				result->linespace = *data++;
+			
+				// read glyph attributes
+				for( int i=0; i<FONT_ASCII_RANGE; i++ )
+					result->advance[i] = *data++;
+			}
+			else
+			{
+				assets->nfonts--;
+				result = 0;
+			}
+		}
+	}
+	
     return result;
 }
 #endif
@@ -674,7 +713,7 @@ void RenderMachine( Shader* shader, Mesh* mesh, Machine* machine, v2 position )
     }
 }
 
-bool32_t CreateUIRegion( UIRegion* region, real32_t x, real32_t y, real32_t w, real32_t h )
+bool32_t CreateGUIRegion( GUIRegion* region, real32_t x, real32_t y, real32_t w, real32_t h )
 {
     region->position.x = x;
     region->position.y = y;
@@ -689,7 +728,7 @@ bool32_t CreateUIRegion( UIRegion* region, real32_t x, real32_t y, real32_t w, r
     return true;
 }
 
-bool32_t AddChild( UIRegion* parent, UIRegion* child )
+bool32_t AddChild( GUIRegion* parent, GUIRegion* child )
 {
     bool32_t result = false;
     
@@ -703,7 +742,7 @@ bool32_t AddChild( UIRegion* parent, UIRegion* child )
     return result;
 }
 
-void RemoveChild( UIRegion* parent, int index )
+void RemoveChildByIndex( GUIRegion* parent, int index )
 {
     // NOTE: Swap the last item with the index. Then decrease the number of children
     if( index >= 0 && index < parent->nchildren )
@@ -713,7 +752,7 @@ void RemoveChild( UIRegion* parent, int index )
     }
 }
 
-bool32_t RemoveChild( UIRegion* parent, UIRegion* child )
+bool32_t RemoveChild( GUIRegion* parent, GUIRegion* child )
 {
     bool32_t result = false;
 
@@ -721,7 +760,7 @@ bool32_t RemoveChild( UIRegion* parent, UIRegion* child )
     {
         if( parent->children[i] == child )
         {
-            RemoveChild( parent, i );
+            RemoveChildByIndex( parent, i );
             result = true;
         }
     }
@@ -729,21 +768,21 @@ bool32_t RemoveChild( UIRegion* parent, UIRegion* child )
     return result;
 }
 
-bool32_t UIRegionPressed( UIRegion* region )
+bool32_t GUIRegionPressed( GUIRegion* region )
 {
     if( region->wasDown )
         return false;
     return region->isDown;
 }
 
-bool32_t UIRegionReleased( UIRegion* region )
+bool32_t GUIRegionReleased( GUIRegion* region )
 {
     if( region->isDown )
         return false;
     return region->wasDown;
 }
 
-void UpdateUIRegion( UIRegion* region, Input* newInput, Input* oldInput, v2 offset = MAKE_v2( 0, 0 ) )
+void UpdateGUIRegion( GUIRegion* region, Input* newInput, Input* oldInput, v2 offset )
 {
     region->wasDown = region->isDown;
     
@@ -752,10 +791,10 @@ void UpdateUIRegion( UIRegion* region, Input* newInput, Input* oldInput, v2 offs
                        Contains( position, region->bounds, newInput->mousePosition ) );;
 
     for( int i=0; i<region->nchildren; i++ )
-        UpdateUIRegion( region->children[i], newInput, oldInput, position );
+        UpdateGUIRegion( region->children[i], newInput, oldInput, position );
 }
 
-void RenderUIRegion( Shader* shader, Mesh* mesh, UIRegion* region, v2 offset = MAKE_v2( 0, 0 ) )
+void RenderGUIRegion( Shader* shader, Mesh* mesh, GUIRegion* region, v2 offset )
 {
     m4 viewMatrix = MATRIX_IDENTITY;
     glUniformMatrix4fv( shader->uniforms[VIEW_MATRIX], 1, GL_FALSE, MATRIX_VALUE( viewMatrix ) );
@@ -776,7 +815,7 @@ void RenderUIRegion( Shader* shader, Mesh* mesh, UIRegion* region, v2 offset = M
     RenderMesh( mesh );
 
     for( int i=0; i<region->nchildren; i++ )
-        RenderUIRegion( shader, mesh, region->children[i], position );
+        RenderGUIRegion( shader, mesh, region->children[i], position );
 }
 
 bool32_t GameInit( Memory* memory )
@@ -852,9 +891,9 @@ bool32_t GameInit( Memory* memory )
         }
     }
 
-    if( !CreateUIRegion( &g->region, 32, 256, 256, 128 ) )
+    if( !CreateGUIRegion( &g->region, 32, 256, 256, 128 ) )
         result = false;
-    if( !CreateUIRegion( &g->childRegion, 0, 0, 256, 12 ) )
+    if( !CreateGUIRegion( &g->childRegion, 0, 0, 256, 12 ) )
         result = false;
     AddChild( &g->region, &g->childRegion );
 
@@ -881,9 +920,9 @@ bool32_t GameUpdate( Memory* memory, Input* newInput, Input* oldInput, real64_t 
             printf( "Failed to place machine.\n" );
     }
 
-    UpdateUIRegion( &g->region, newInput, oldInput );
+    UpdateGUIRegion( &g->region, newInput, oldInput, MAKE_v2(0,0) );
 
-    if( UIRegionReleased( &g->childRegion ) )
+    if( GUIRegionReleased( &g->childRegion ) )
         printf( "Titlebar pressed.\n" );
     
     return true;
@@ -918,5 +957,5 @@ void GameRender( Memory* memory )
                 MAKE_v4( 0.0f, 1.0f, 0.0f, 1.0f ) );
 
     glBindTexture( GL_TEXTURE_2D, g->texture->id );
-    RenderUIRegion( &g->shader, &g->quadMesh, &g->region );
+    RenderGUIRegion( &g->shader, &g->quadMesh, &g->region, MAKE_v2(0,0) );
 }

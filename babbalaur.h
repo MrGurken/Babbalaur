@@ -36,8 +36,7 @@
 #define DIFFUSE_FS_PATH "diffuse"
 #define TILESHEET_PATH "tilesheet"
 #define TILESHEET_NAME "Tilesheet"
-#define FONT_TEXTURE_PATH "verdana24"
-#define FONT_INFO_PATH "verdana24"
+#define FONT_PATH "verdana24"
 #define FONT_NAME "Verdana24"
 
 #define WINDOW_X 32
@@ -207,7 +206,7 @@ typedef struct MachineTag
 } Machine;
 
 #define REGION_MAX_CHILDREN 8
-typedef struct UIRegionTag
+typedef struct GUIRegionTag
 {
     v2 position;
     v2 bounds;
@@ -215,10 +214,10 @@ typedef struct UIRegionTag
     bool32_t wasDown;
     Texture* background;
 
-    UIRegionTag* parent;
-    UIRegionTag* children[REGION_MAX_CHILDREN];
+    struct GUIRegionTag* parent;
+    struct GUIRegionTag* children[REGION_MAX_CHILDREN];
     int nchildren;
-} UIRegion;
+} GUIRegion;
 
 typedef struct GamestateTag
 {
@@ -230,8 +229,8 @@ typedef struct GamestateTag
     Font* font;
     uint8_t map[GAME_MAP_HEIGHT*GAME_MAP_WIDTH];
     Machine machines[GAME_MAP_HEIGHT*GAME_MAP_WIDTH];
-    UIRegion region;
-    UIRegion childRegion;
+    GUIRegion region;
+    GUIRegion childRegion;
     Memory memory;
 } Gamestate;
 
