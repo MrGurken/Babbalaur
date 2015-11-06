@@ -19,6 +19,7 @@ using namespace std;
 #define ASCII_SPACE 32
 #define ASCII_DEL 127
 #define ASCII_RANGE (ASCII_DEL-ASCII_SPACE-1) // 95
+#define FONT_MAX_PATH 128
 
 #define CHARS_PER_ROW 10 // 10*10 = 100, we need 96
 
@@ -32,10 +33,12 @@ int main( int argc, char* argv[] )
 {
     if( argc < 4 )
     {
-        printf( "Usage: font_maker.exe [fontname] [fontsize] [filename]\n" );
+        printf( "Usage: font_maker.exe [fontname] [fontsize] [filename] [opt:texture path]\n" );
         printf( "[fontname] is the location of the font you wish to load.\n" );
         printf( "[fontsize] is roughly the vertical size of the font in pixels.\n" );
         printf( "[filename] is the name of the file you wish to save as.\n" );
+        printf( "Optional:\n" );
+        printf( "[texture path] the path from the game executable to the texture.\n" );
         return 0;
     }
     else
@@ -52,6 +55,7 @@ int main( int argc, char* argv[] )
         const char* fontname = argv[1];
         int fontsize = atoi( argv[2] );
         const char* filename = argv[3];
+        const char* texturePath = ( argc > 4 ? argv[4] : filename );
         
         if( fontsize > 0 )
         {
@@ -90,8 +94,8 @@ int main( int argc, char* argv[] )
                     }
                 }
 
-                int ascent = TTF_FontAscent( font );
-                int descent = TTF_FontDescent( font );
+                //int ascent = TTF_FontAscent( font );
+                //int descent = TTF_FontDescent( font );
                 int lineskip = TTF_FontLineSkip( font );
 
                 int linespace;
@@ -127,8 +131,14 @@ int main( int argc, char* argv[] )
                         ofstream stream( name, ios::out | ios::binary );
                         if( stream.is_open() )
                         {
-                            char buf[ASCII_RANGE] = { maxVal, ascent, descent, lineskip, linespace };
-                            stream.write( buf, 5 );
+                            char buf[FONT_MAX_PATH] = {};
+                            strncpy( buf, texturePath, FONT_MAX_PATH );
+                            stream.write( buf, FONT_MAX_PATH );
+
+                            buf[0] = maxVal;
+                            buf[1] = lineskip;
+                            buf[2] = linespace;
+                            stream.write( buf, 3 );
                             
                             int i=0;
                             for( int y=0; y<CHARS_PER_ROW && i<ASCII_RANGE; y++ )

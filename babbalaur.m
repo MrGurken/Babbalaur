@@ -190,7 +190,7 @@ void UnloadTexture( Texture* texture )
 }
 
 #ifdef _WIN32
-Font* LoadFont( Assets* assets, const char* texture, const char* info, const char* name )
+/*Font* LoadFont( Assets* assets, const char* texture, const char* info, const char* name )
 {
     Font* result = 0;
 
@@ -228,6 +228,54 @@ Font* LoadFont( Assets* assets, const char* texture, const char* info, const cha
         {
             assets->nfonts--;
             result = 0;
+        }
+    }
+
+    return result;
+    }*/
+
+Font* LoadFont( Assets* assets, const char* font, const char* name )
+{
+    Font* result = 0;
+
+    for( int i=0; i<assets->nfonts && result == 0; i++ )
+        if( strncmp( assets->fontNames[i], name, ASSETS_MAX_NAME ) == 0 )
+            result = &assets->fonts[i];
+
+    if( result == 0 && assets->nfonts < ASSETS_MAX_FONTS )
+    {
+        result = &assets->fonts[assets->nfonts];
+        strncpy( assets->fontNames[assets->nfonts], name, ASSETS_MAX_NAME );
+        assets->nfonts++;
+        
+        std::ifstream stream( font, std::ios::in | std::ios::binary );
+        if( stream.is_open() )
+        {
+            // read the path to the font texture
+            char buf[FONT_MAX_PATH] = {};
+            stream.read( buf, FONT_MAX_PATH );
+
+            result->texture = LoadTexture( assets, buf, name );
+
+            if( result->texture )
+            {
+                // read the font specific attributes
+                stream.read( buf, 3 );
+            
+                result->size = buf[0];
+                result->lineskip = buf[1];
+                result->linespace = buf[2];
+
+                // read the glyph specific attributes
+                stream.read( (char*)(&result->advance), FONT_ASCII_RANGE );
+            }
+            else
+            {
+                assets->nfonts--;
+                result = 0;
+            }
+            
+            stream.close();
         }
     }
 
@@ -783,13 +831,8 @@ bool32_t GameInit( Memory* memory )
         result = false;
     else
     {
-        /*if( !LoadTexture( &g->assets, TILESHEET_PATH, TILESHEET_NAME ) )
-            result = false;
-        if( !LoadFont( &g->assets, FONT_TEXTURE_PATH, FONT_INFO_PATH, FONT_NAME ) )
-        result = false;*/
-
         g->texture = LoadTexture( &g->assets, TILESHEET_PATH, TILESHEET_NAME );
-        g->font = LoadFont( &g->assets, FONT_TEXTURE_PATH, FONT_INFO_PATH, FONT_NAME );
+        g->font = LoadFont( &g->assets, FONT_PATH, FONT_NAME );
 
         if( !g->texture || !g->font )
             result = false;

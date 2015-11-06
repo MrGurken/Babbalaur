@@ -22,8 +22,7 @@
 #define DIFFUSE_FS_PATH "./shaders/diffuse.fs"
 #define TILESHEET_PATH "./textures/tilesheet.png"
 #define TILESHEET_NAME "Tilesheet"
-#define FONT_TEXTURE_PATH "./fonts/verdana24.png"
-#define FONT_INFO_PATH "./fonts/verdana24.txt"
+#define FONT_PATH "./fonts/verdana24.txt"
 #define FONT_NAME "Verdana24"
 
 #define WINDOW_X SDL_WINDOWPOS_UNDEFINED
@@ -137,6 +136,7 @@ typedef struct TextureTag
 #define FONT_ASCII_MAX 127 // 127 = DEL
 #define FONT_ASCII_RANGE (FONT_ASCII_MAX-FONT_ASCII_MIN) // 96
 #define FONT_GLYPHS_PER_ROW 10
+#define FONT_MAX_PATH 128
 typedef struct FontTag
 {
     Texture* texture;
