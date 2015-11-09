@@ -818,6 +818,99 @@ void RenderGUIRegion( Shader* shader, Mesh* mesh, GUIRegion* region, v2 offset )
         RenderGUIRegion( shader, mesh, region->children[i], position );
 }
 
+bool32_t CreateScreen( Screen* screen, const char* title, ScreenUpdateFunction* update, ScreenRenderFunction* render )
+{
+	strncpy( screen->title, title, SCREEN_MAX_TITLE );
+	screen->update = update;
+	screen->render = render;
+	
+	return true;
+}
+
+bool32_t CreateScreenBuffer( ScreenBuffer* buffer )
+{
+	buffer->current = 0;
+	
+	return true;
+}
+
+void PushScreen( ScreenBuffer* buffer, Screen* screen )
+{
+	buffer->current++;
+	if( buffer->current >= SCREEN_BUFFER_MAX )
+		buffer->current = 0;
+	
+	buffer->screens[buffer->current] = screen;
+	buffer->curScreen = screen;
+	
+	if( buffer->nscreens < SCREEN_BUFFER_MAX )
+		buffer->nscreens++;
+}
+
+void PopScreen( ScreenBuffer* buffer )
+{
+	if( buffer->nscreens > 0 )
+	{
+		buffer->current--;
+		if( buffer->current < 0 )
+			buffer->current = SCREEN_BUFFER_MAX-1;
+	
+		buffer->curScreen = buffer->screens[buffer->current];
+		buffer->nscreens--;
+	}
+}
+
+void MainScreen_Update( Memory* memory, Input* newInput, Input* oldInput, real32_t dt )
+{
+	Gamestate* g = (Gamestate*)memory->pointer;
+	
+	if( ButtonPressed( newInput, oldInput, BUTTON_LEFT) )
+		PopScreen( &g->screenBuffer );
+		//PushScreen( &g->screenBuffer, &g->optionsScreen );
+}
+
+void MainScreen_Render( Memory* memory )
+{
+	Gamestate* g = (Gamestate*)memory->pointer;
+	
+	glClearColor( 1.0f, 0.0f, 0.0f, 0.0f );
+	glClear( GL_COLOR_BUFFER_BIT );
+	
+	glUseProgram( g->shader.program );
+	glBindTexture( GL_TEXTURE_2D, g->texture->id );
+	
+	glUniformMatrix4fv( g->shader.uniforms[PROJECTION_MATRIX], 1, GL_FALSE, MATRIX_VALUE( g->camera.projection ) );
+	glUniformMatrix4fv( g->shader.uniforms[VIEW_MATRIX], 1, GL_FALSE, MATRIX_VALUE( g->camera.view ) );
+	glUniform4f( g->shader.uniforms[COLOR], 1.0f, 1.0f, 1.0f, 1.0f );
+	
+	RenderText( &g->shader, &g->quadMesh, g->font, g->mainScreen.title, MAKE_v2( 32, 32 ), MAKE_v4( 1.0f, 0.0f, 1.0f, 1.0f ) );
+}
+
+void OptionsScreen_Update( Memory* memory, Input* newInput, Input* oldInput, real32_t dt )
+{
+	Gamestate* g = (Gamestate*)memory->pointer;
+	
+	if( ButtonPressed( newInput, oldInput, BUTTON_LEFT ) )
+		PopScreen( &g->screenBuffer );
+}
+
+void OptionsScreen_Render( Memory* memory )
+{
+	Gamestate* g = (Gamestate*)memory->pointer;
+	
+	glClearColor( 0.0f, 1.0f, 0.0f, 1.0f );
+	glClear( GL_COLOR_BUFFER_BIT );
+	
+	glUseProgram( g->shader.program );
+	glBindTexture( GL_TEXTURE_2D, g->texture->id );
+	
+	glUniformMatrix4fv( g->shader.uniforms[PROJECTION_MATRIX], 1, GL_FALSE, MATRIX_VALUE( g->camera.projection ) );
+	glUniformMatrix4fv( g->shader.uniforms[VIEW_MATRIX], 1, GL_FALSE, MATRIX_VALUE( g->camera.view ) );
+	glUniform4f( g->shader.uniforms[COLOR], 1.0f, 1.0f, 1.0f, 1.0f );
+	
+	RenderText( &g->shader, &g->quadMesh, g->font, g->optionsScreen.title, MAKE_v2( 32, 32 ), MAKE_v4( 0.0f, 1.0f, 1.0f, 1.0f ) );
+}
+
 bool32_t GameInit( Memory* memory )
 {
     bool32_t result = true;
@@ -896,6 +989,17 @@ bool32_t GameInit( Memory* memory )
     if( !CreateGUIRegion( &g->childRegion, 0, 0, 256, 12 ) )
         result = false;
     AddChild( &g->region, &g->childRegion );
+	
+	// make screens
+	if( !CreateScreen( &g->mainScreen, "Main Menu", MainScreen_Update, MainScreen_Render ) )
+		result = false;
+	if( !CreateScreen( &g->optionsScreen, "Options", OptionsScreen_Update, OptionsScreen_Render ) )
+		result = false;
+	if( !CreateScreenBuffer( &g->screenBuffer ) )
+		result = false;
+	
+	PushScreen( &g->screenBuffer, &g->mainScreen );
+	PushScreen( &g->screenBuffer, &g->optionsScreen );
 
     glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
     glEnable( GL_BLEND );
@@ -905,9 +1009,17 @@ bool32_t GameInit( Memory* memory )
 
 bool32_t GameUpdate( Memory* memory, Input* newInput, Input* oldInput, real64_t dt )
 {
+	bool32_t result = false;
+	
     Gamestate* g = (Gamestate*)memory->pointer;
-    
-    if( ButtonReleased( newInput, oldInput, BUTTON_LEFT ) )
+	
+	if( g->screenBuffer.nscreens >  0 )
+	{
+		g->screenBuffer.curScreen->update( memory, newInput, oldInput, dt );
+		result = true;
+	}
+	
+    /*if( ButtonReleased( newInput, oldInput, BUTTON_LEFT ) )
     {
         v2 mpos = newInput->mousePosition;
         v2 worldPos = ScreenToWorld( g->camera.position, mpos );
@@ -923,16 +1035,19 @@ bool32_t GameUpdate( Memory* memory, Input* newInput, Input* oldInput, real64_t 
     UpdateGUIRegion( &g->region, newInput, oldInput, MAKE_v2(0,0) );
 
     if( GUIRegionReleased( &g->childRegion ) )
-        printf( "Titlebar pressed.\n" );
+        printf( "Titlebar pressed.\n" );*/
     
-    return true;
+    return result;
 }
 
 void GameRender( Memory* memory )
 {
     Gamestate* g = (Gamestate*)memory->pointer;
+	
+	if( g->screenBuffer.nscreens > 0 )
+		g->screenBuffer.curScreen->render( memory );
     
-    glClearColor( 0.0f, 0.0f, 0.0f, 0.0f );
+    /*glClearColor( 0.0f, 0.0f, 0.0f, 0.0f );
     glClear( GL_COLOR_BUFFER_BIT );
 
     glUseProgram( g->shader.program );
@@ -957,5 +1072,5 @@ void GameRender( Memory* memory )
                 MAKE_v4( 0.0f, 1.0f, 0.0f, 1.0f ) );
 
     glBindTexture( GL_TEXTURE_2D, g->texture->id );
-    RenderGUIRegion( &g->shader, &g->quadMesh, &g->region, MAKE_v2(0,0) );
+    RenderGUIRegion( &g->shader, &g->quadMesh, &g->region, MAKE_v2(0,0) );*/
 }

@@ -219,6 +219,25 @@ typedef struct GUIRegionTag
     int nchildren;
 } GUIRegion;
 
+#define SCREEN_MAX_TITLE 32
+typedef void (ScreenUpdateFunction)( Memory* memory, Input* newInput, Input* oldInput, real32_t dt );
+typedef void (ScreenRenderFunction)( Memory* memory );
+typedef struct ScreenTag
+{
+	char title[SCREEN_MAX_TITLE];
+	ScreenUpdateFunction* update;
+	ScreenRenderFunction* render;
+} Screen;
+
+#define SCREEN_BUFFER_MAX 8
+typedef struct ScreenBufferTag
+{
+	Screen* screens[SCREEN_BUFFER_MAX];
+	int nscreens;
+	int current;
+	Screen* curScreen;
+} ScreenBuffer;
+
 typedef struct GamestateTag
 {
     Mesh quadMesh;
@@ -231,6 +250,9 @@ typedef struct GamestateTag
     Machine machines[GAME_MAP_HEIGHT*GAME_MAP_WIDTH];
     GUIRegion region;
     GUIRegion childRegion;
+	Screen mainScreen;
+	Screen optionsScreen;
+	ScreenBuffer screenBuffer;
     Memory memory;
 } Gamestate;
 
