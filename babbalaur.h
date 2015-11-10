@@ -22,6 +22,8 @@
 #define DIFFUSE_FS_PATH "./shaders/diffuse.fs"
 #define TILESHEET_PATH "./textures/tilesheet.png"
 #define TILESHEET_NAME "Tilesheet"
+#define ARROWS_PATH "./textures/arrows.png"
+#define ARROWS_NAME "Arrows"
 #define FONT_PATH "./fonts/verdana24.txt"
 #define FONT_NAME "Verdana24"
 
@@ -179,8 +181,8 @@ enum
 {
     ORIENTATION_LEFT = 0,
     ORIENTATION_RIGHT,
-    ORIENTATION_TOP,
-    ORIENTATION_BOTTOM
+    ORIENTATION_UP,
+    ORIENTATION_DOWN
 };
 
 enum
@@ -197,13 +199,44 @@ enum
 };
 #define MACHINE_ADJ_LENGTH 3
 
+enum
+{
+    MACHINE_PROVIDER=2,
+    MACHINE_COLLECTOR,
+    MACHINE_CONVEYER_BELT,
+    MACHINE_ASSEMBLER,
+};
+
+#define PART_ARBITRARY 2
+typedef int Part;
+
+#define MACHINE_DELAY 30
+#define MACHINE_MAX (GAME_MAP_HEIGHT*GAME_MAP_WIDTH)
+#define MACHINE_MAX_PARTS 5
 typedef struct MachineTag
 {
     int orientation;
     p2 gridPoint;
     bool32_t alive;
     int type;
+    int delay;
+    //Part parts[MACHINE_MAX_PARTS];
+    //int nparts;
+    Part inBuffer[MACHINE_MAX_PARTS];
+    int ninParts;
+    Part outBuffer[MACHINE_MAX_PARTS];
+    int noutParts;
 } Machine;
+
+#define LEVEL_DELAY 150
+typedef struct LevelTag
+{
+    bool32_t running;
+    int incoming;
+    int outgoing;
+    int delay;
+    int curOrientation;
+} Level;
 
 #define REGION_MAX_CHILDREN 8
 typedef struct GUIRegionTag
@@ -224,18 +257,18 @@ typedef void (ScreenUpdateFunction)( Memory* memory, Input* newInput, Input* old
 typedef void (ScreenRenderFunction)( Memory* memory );
 typedef struct ScreenTag
 {
-	char title[SCREEN_MAX_TITLE];
-	ScreenUpdateFunction* update;
-	ScreenRenderFunction* render;
+    char title[SCREEN_MAX_TITLE];
+    ScreenUpdateFunction* update;
+    ScreenRenderFunction* render;
 } Screen;
 
 #define SCREEN_BUFFER_MAX 8
 typedef struct ScreenBufferTag
 {
-	Screen* screens[SCREEN_BUFFER_MAX];
-	int nscreens;
-	int current;
-	Screen* curScreen;
+    Screen* screens[SCREEN_BUFFER_MAX];
+    int nscreens;
+    int current;
+    Screen* curScreen;
 } ScreenBuffer;
 
 typedef struct GamestateTag
@@ -245,14 +278,16 @@ typedef struct GamestateTag
     Camera camera;
     Assets assets;
     Texture* texture;
+    Texture* arrowsTexture;
     Font* font;
     uint8_t map[GAME_MAP_HEIGHT*GAME_MAP_WIDTH];
-    Machine machines[GAME_MAP_HEIGHT*GAME_MAP_WIDTH];
+    Machine machines[MACHINE_MAX];
+    Level level;
     GUIRegion region;
     GUIRegion childRegion;
-	Screen mainScreen;
-	Screen optionsScreen;
-	ScreenBuffer screenBuffer;
+    Screen mainScreen;
+    Screen optionsScreen;
+    ScreenBuffer screenBuffer;
     Memory memory;
 } Gamestate;
 

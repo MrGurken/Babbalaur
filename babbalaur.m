@@ -169,7 +169,7 @@ Texture* LoadTexture( Assets* assets, const char* file, const char* name )
         
         NSString* texturePath = [[NSBundle mainBundle] pathForResource:[NSString stringWithUTF8String:file] ofType:@"png"];
         NSError* theError;
-		GLKTextureInfo* info = [GLKTextureLoader textureWithContentsOfFile:texturePath options:nil error:&theError];
+        GLKTextureInfo* info = [GLKTextureLoader textureWithContentsOfFile:texturePath options:nil error:&theError];
 
         result->id = info.name;
         result->width = info.width;
@@ -284,52 +284,52 @@ Font* LoadFont( Assets* assets, const char* font, const char* name )
 #else
 Font* LoadFont( Assets* assets, const char* file, const char* name )
 {
-	Font* result = 0;
-	
-	for( int i=0; i<assets->nfonts; i++ )
-		if( strncmp( assets->fontNames[i], name, ASSETS_MAX_NAME ) == 0 )
-			result = &assets->fonts[i];
-	
-	if( result == 0 && assets->nfonts < ASSETS_MAX_TEXTURES )
-	{
-		NSString* infoPath = [[NSBundle mainBundle] pathForResource:[NSString stringWithUTF8String:file] ofType:@".txt"];
-		NSString* content = [NSString stringWithContentsOfFile:infoPath encoding:NSUTF8StringEncoding error:nil];
-		
-		if( content.length > 0 )
-		{
-			result = &assets->fonts[assets->nfonts];
-			strncpy( assets->fontNames[assets->nfonts], name, ASSETS_MAX_NAME );
-			assets->nfonts++;
-			
-			const char* data = [content UTF8String];
-		
-			// read the path to the font texture
-			char buf[FONT_MAX_PATH] = {};
-			strncpy( buf, data, FONT_MAX_PATH );
-		
-			result->texture = LoadTexture( assets, buf, name );
-		
-			if( result )
-			{
-				// read font attributes
-				data += FONT_MAX_PATH;
-			
-				result->size = *data++;
-				result->lineskip = *data++;
-				result->linespace = *data++;
-			
-				// read glyph attributes
-				for( int i=0; i<FONT_ASCII_RANGE; i++ )
-					result->advance[i] = *data++;
-			}
-			else
-			{
-				assets->nfonts--;
-				result = 0;
-			}
-		}
-	}
-	
+    Font* result = 0;
+    
+    for( int i=0; i<assets->nfonts; i++ )
+        if( strncmp( assets->fontNames[i], name, ASSETS_MAX_NAME ) == 0 )
+            result = &assets->fonts[i];
+    
+    if( result == 0 && assets->nfonts < ASSETS_MAX_TEXTURES )
+    {
+        NSString* infoPath = [[NSBundle mainBundle] pathForResource:[NSString stringWithUTF8String:file] ofType:@".txt"];
+        NSString* content = [NSString stringWithContentsOfFile:infoPath encoding:NSUTF8StringEncoding error:nil];
+        
+        if( content.length > 0 )
+        {
+            result = &assets->fonts[assets->nfonts];
+            strncpy( assets->fontNames[assets->nfonts], name, ASSETS_MAX_NAME );
+            assets->nfonts++;
+            
+            const char* data = [content UTF8String];
+        
+            // read the path to the font texture
+            char buf[FONT_MAX_PATH] = {};
+            strncpy( buf, data, FONT_MAX_PATH );
+        
+            result->texture = LoadTexture( assets, buf, name );
+        
+            if( result )
+            {
+                // read font attributes
+                data += FONT_MAX_PATH;
+            
+                result->size = *data++;
+                result->lineskip = *data++;
+                result->linespace = *data++;
+            
+                // read glyph attributes
+                for( int i=0; i<FONT_ASCII_RANGE; i++ )
+                    result->advance[i] = *data++;
+            }
+            else
+            {
+                assets->nfonts--;
+                result = 0;
+            }
+        }
+    }
+    
     return result;
 }
 #endif
@@ -546,7 +546,7 @@ v2 GetTileOffset( uint8_t id )
     return result;
 }
 
-void RenderTile( Shader* shader, Mesh* mesh, uint8_t id, v2 position )
+void RenderTile( Shader* shader, Mesh* mesh, Texture* tilesheet, uint8_t id, v2 position )
 {
     if( id > 0 )
     {
@@ -557,6 +557,9 @@ void RenderTile( Shader* shader, Mesh* mesh, uint8_t id, v2 position )
         glUniformMatrix4fv( shader->uniforms[MODEL_MATRIX], 1, GL_FALSE, MATRIX_VALUE(modelMatrix) );
         glUniform2f( shader->uniforms[UV_OFFSET], tileOffset.x, tileOffset.y );
         glUniform1f( shader->uniforms[UV_LENGTH], TILE_UV_LENGTH );
+        glUniform4f( shader->uniforms[COLOR], 1.0f, 1.0f, 1.0f, 1.0f );
+
+        glBindTexture( GL_TEXTURE_2D, tilesheet->id );
         
         RenderMesh( mesh );
     }
@@ -677,6 +680,32 @@ bool32_t GetAdjacentMachine( Machine* machines,
     return result;
 }
 
+p2 NextGridPoint( int orientation )
+{
+    p2 result = { 0, 0 };
+    
+    switch( orientation )
+    {
+        case ORIENTATION_LEFT: result.x--; break;
+        case ORIENTATION_RIGHT: result.x++; break;
+        case ORIENTATION_UP: result.y--; break;
+        case ORIENTATION_DOWN: result.y++; break;
+    }
+
+    return result;
+}
+
+Machine* NextMachine( Machine* machines, p2 gridPoint )
+{
+    Machine* current = GridToMachine( machines, gridPoint );
+    p2 nextPoint = NextGridPoint( current->orientation );
+
+    gridPoint.x += nextPoint.x;
+    gridPoint.y += nextPoint.y;
+
+    return GridToMachine( machines, gridPoint );
+}
+
 Machine* PlaceMachine( Machine* machines, p2 gridPoint, int type )
 {
     Machine* machine = GridToMachine( machines, gridPoint );
@@ -690,26 +719,153 @@ Machine* PlaceMachine( Machine* machines, p2 gridPoint, int type )
     return machine;
 }
 
+bool32_t PushPart( Machine* machine, Part part )
+{
+    bool32_t result = false;
+
+    if( machine->nparts < MACHINE_MAX_PARTS )
+    {
+        machine->parts[machine->nparts++] = part;
+        result = true;
+    }
+
+    return result;
+}
+
+bool32_t PopPart( Machine* machine )
+{
+    bool32_t result = false;
+
+    if( machine->nparts > 0 )
+    {
+        for( int i=0; i<machine->nparts-1; i++ )
+            machine->parts[i] = machine->parts[i+1];
+        machine->nparts--;
+        
+        result = true;
+    }
+
+    return result;
+}
+
 bool32_t CreateMachine( Machine* machine, p2 gridPoint )
 {
     machine->orientation = ORIENTATION_LEFT;
     machine->gridPoint = gridPoint;
     machine->alive = false;
     machine->type = 1;
+    machine->delay = MACHINE_DELAY;
+    machine->nparts = 0;
 
     return true;
 }
 
-void RenderMachine( Shader* shader, Mesh* mesh, Machine* machine, v2 position )
+void RenderMachine( Shader* shader, Mesh* mesh,
+                    Texture* tilesheet, Texture* arrows,
+                    Machine* machine, v2 position )
 {
     if( machine->alive )
     {
         m4 modelMatrix = MATRIX_MULTIPLY( MATRIX_TRANSLATION( position.x, position.y, 0.0f ), MATRIX_SCALE( TILE_SIZE, TILE_SIZE, 1.0f ) );
         glUniformMatrix4fv( shader->uniforms[MODEL_MATRIX], 1, GL_FALSE, MATRIX_VALUE(modelMatrix) );
-        glUniform2f( shader->uniforms[UV_OFFSET], 0.0f, 0.0f );
-        glUniform1f( shader->uniforms[UV_LENGTH], 1.0f );
+
+        v2 offset = GetTileOffset( machine->type );
+        glUniform2f( shader->uniforms[UV_OFFSET], offset.x, offset.y );
+        glUniform1f( shader->uniforms[UV_LENGTH], TILE_UV_LENGTH );
+
+        if( machine->nparts > 0 )
+            glUniform4f( shader->uniforms[COLOR], 1.0f, 0.0f, 0.0f, 1.0f );
+        else
+            glUniform4f( shader->uniforms[COLOR], 1.0f, 1.0f, 1.0f, 1.0f );
+
+        glBindTexture( GL_TEXTURE_2D, tilesheet->id );
 
         RenderMesh( mesh );
+
+        offset.x = (real32_t)( machine->orientation % 2 );
+        offset.y = (real32_t)( machine->orientation / 2 );
+        glUniform2f( shader->uniforms[UV_OFFSET], offset.x*0.5f, offset.y*0.5f );
+        glUniform1f( shader->uniforms[UV_LENGTH], 0.5f );
+
+        glBindTexture( GL_TEXTURE_2D, arrows->id );
+
+        RenderMesh( mesh );
+    }
+}
+
+bool32_t CreateLevel( Level* level )
+{
+    level->running = false;
+    level->incoming = 3;
+    level->outgoing = 0;
+    level->delay = LEVEL_DELAY;
+    level->curOrientation = ORIENTATION_DOWN;
+
+    return true;
+}
+
+void UpdateLevel( Level* level, Machine* machines )
+{
+    p2 gridPoint = { 3, 0 };
+    Machine* provider = GridToMachine( machines, gridPoint );
+
+    gridPoint.y = 9;
+    Machine* collector = GridToMachine( machines, gridPoint );
+
+    if( provider )
+    {
+        if( level->incoming > 0 )
+        {
+            if( level->delay <= 0 )
+            {
+                PushPart( provider, PART_ARBITRARY );
+                
+                level->delay = LEVEL_DELAY;
+                level->incoming--;
+                printf( "Giving part to provider.\n" );
+            }
+            else
+                level->delay--;
+        }
+    }
+
+    int i=0;
+    for( int y=0; y<GAME_MAP_HEIGHT; y++ )
+    {
+        for( int x=0; x<GAME_MAP_WIDTH; x++, i++ )
+        {
+            if( machines[i].alive )
+            {
+                int minRequired = ( machines[i].type == MACHINE_ASSEMBLER ? 1 : 0 );
+                if( machines[i].nparts > minRequired )
+                {
+                    if( machines[i].delay <= 0 )
+                    {
+                        p2 gridPoint = { x, y };
+                        Machine* next = NextMachine( machines, gridPoint );
+
+                        if( next == collector )
+                        {
+                            level->outgoing++;
+                            PopPart( machines+i );
+                            machines[i].delay = MACHINE_DELAY;
+                        }
+                        else if( next && next->alive )
+                        {
+                            if( PushPart( next, PART_ARBITRARY ) )
+                            {
+                                PopPart( machines+i );
+                                if( minRequired > 0 )
+                                    PopPart( machines+i );
+                                machines[i].delay = MACHINE_DELAY;
+                            }
+                        }
+                    }
+                    else
+                        machines[i].delay--;
+                }
+            }
+        }
     }
 }
 
@@ -820,95 +976,96 @@ void RenderGUIRegion( Shader* shader, Mesh* mesh, GUIRegion* region, v2 offset )
 
 bool32_t CreateScreen( Screen* screen, const char* title, ScreenUpdateFunction* update, ScreenRenderFunction* render )
 {
-	strncpy( screen->title, title, SCREEN_MAX_TITLE );
-	screen->update = update;
-	screen->render = render;
-	
-	return true;
+    strncpy( screen->title, title, SCREEN_MAX_TITLE );
+    screen->update = update;
+    screen->render = render;
+    
+    return true;
 }
 
 bool32_t CreateScreenBuffer( ScreenBuffer* buffer )
 {
-	buffer->current = 0;
-	
-	return true;
+    buffer->current = 0;
+    buffer->nscreens = 0;
+    
+    return true;
 }
 
 void PushScreen( ScreenBuffer* buffer, Screen* screen )
 {
-	buffer->current++;
-	if( buffer->current >= SCREEN_BUFFER_MAX )
-		buffer->current = 0;
-	
-	buffer->screens[buffer->current] = screen;
-	buffer->curScreen = screen;
-	
-	if( buffer->nscreens < SCREEN_BUFFER_MAX )
-		buffer->nscreens++;
+    buffer->current++;
+    if( buffer->current >= SCREEN_BUFFER_MAX )
+        buffer->current = 0;
+    
+    buffer->screens[buffer->current] = screen;
+    buffer->curScreen = screen;
+    
+    if( buffer->nscreens < SCREEN_BUFFER_MAX )
+        buffer->nscreens++;
 }
 
 void PopScreen( ScreenBuffer* buffer )
 {
-	if( buffer->nscreens > 0 )
-	{
-		buffer->current--;
-		if( buffer->current < 0 )
-			buffer->current = SCREEN_BUFFER_MAX-1;
-	
-		buffer->curScreen = buffer->screens[buffer->current];
-		buffer->nscreens--;
-	}
+    if( buffer->nscreens > 0 )
+    {
+        buffer->current--;
+        if( buffer->current < 0 )
+            buffer->current = SCREEN_BUFFER_MAX-1;
+    
+        buffer->curScreen = buffer->screens[buffer->current];
+        buffer->nscreens--;
+    }
 }
 
 void MainScreen_Update( Memory* memory, Input* newInput, Input* oldInput, real32_t dt )
 {
-	Gamestate* g = (Gamestate*)memory->pointer;
-	
-	if( ButtonPressed( newInput, oldInput, BUTTON_LEFT) )
-		PopScreen( &g->screenBuffer );
-		//PushScreen( &g->screenBuffer, &g->optionsScreen );
+    Gamestate* g = (Gamestate*)memory->pointer;
+    
+    if( ButtonPressed( newInput, oldInput, BUTTON_LEFT) )
+        PopScreen( &g->screenBuffer );
+        //PushScreen( &g->screenBuffer, &g->optionsScreen );
 }
 
 void MainScreen_Render( Memory* memory )
 {
-	Gamestate* g = (Gamestate*)memory->pointer;
-	
-	glClearColor( 1.0f, 0.0f, 0.0f, 0.0f );
-	glClear( GL_COLOR_BUFFER_BIT );
-	
-	glUseProgram( g->shader.program );
-	glBindTexture( GL_TEXTURE_2D, g->texture->id );
-	
-	glUniformMatrix4fv( g->shader.uniforms[PROJECTION_MATRIX], 1, GL_FALSE, MATRIX_VALUE( g->camera.projection ) );
-	glUniformMatrix4fv( g->shader.uniforms[VIEW_MATRIX], 1, GL_FALSE, MATRIX_VALUE( g->camera.view ) );
-	glUniform4f( g->shader.uniforms[COLOR], 1.0f, 1.0f, 1.0f, 1.0f );
-	
-	RenderText( &g->shader, &g->quadMesh, g->font, g->mainScreen.title, MAKE_v2( 32, 32 ), MAKE_v4( 1.0f, 0.0f, 1.0f, 1.0f ) );
+    Gamestate* g = (Gamestate*)memory->pointer;
+    
+    glClearColor( 1.0f, 0.0f, 0.0f, 0.0f );
+    glClear( GL_COLOR_BUFFER_BIT );
+    
+    glUseProgram( g->shader.program );
+    glBindTexture( GL_TEXTURE_2D, g->texture->id );
+    
+    glUniformMatrix4fv( g->shader.uniforms[PROJECTION_MATRIX], 1, GL_FALSE, MATRIX_VALUE( g->camera.projection ) );
+    glUniformMatrix4fv( g->shader.uniforms[VIEW_MATRIX], 1, GL_FALSE, MATRIX_VALUE( g->camera.view ) );
+    glUniform4f( g->shader.uniforms[COLOR], 1.0f, 1.0f, 1.0f, 1.0f );
+    
+    RenderText( &g->shader, &g->quadMesh, g->font, g->mainScreen.title, MAKE_v2( 32, 32 ), MAKE_v4( 1.0f, 0.0f, 1.0f, 1.0f ) );
 }
 
 void OptionsScreen_Update( Memory* memory, Input* newInput, Input* oldInput, real32_t dt )
 {
-	Gamestate* g = (Gamestate*)memory->pointer;
-	
-	if( ButtonPressed( newInput, oldInput, BUTTON_LEFT ) )
-		PopScreen( &g->screenBuffer );
+    Gamestate* g = (Gamestate*)memory->pointer;
+    
+    if( ButtonPressed( newInput, oldInput, BUTTON_LEFT ) )
+        PopScreen( &g->screenBuffer );
 }
 
 void OptionsScreen_Render( Memory* memory )
 {
-	Gamestate* g = (Gamestate*)memory->pointer;
-	
-	glClearColor( 0.0f, 1.0f, 0.0f, 1.0f );
-	glClear( GL_COLOR_BUFFER_BIT );
-	
-	glUseProgram( g->shader.program );
-	glBindTexture( GL_TEXTURE_2D, g->texture->id );
-	
-	glUniformMatrix4fv( g->shader.uniforms[PROJECTION_MATRIX], 1, GL_FALSE, MATRIX_VALUE( g->camera.projection ) );
-	glUniformMatrix4fv( g->shader.uniforms[VIEW_MATRIX], 1, GL_FALSE, MATRIX_VALUE( g->camera.view ) );
-	glUniform4f( g->shader.uniforms[COLOR], 1.0f, 1.0f, 1.0f, 1.0f );
-	
-	RenderText( &g->shader, &g->quadMesh, g->font, g->optionsScreen.title, MAKE_v2( 32, 32 ), MAKE_v4( 0.0f, 1.0f, 1.0f, 1.0f ) );
+    Gamestate* g = (Gamestate*)memory->pointer;
+    
+    glClearColor( 0.0f, 1.0f, 0.0f, 1.0f );
+    glClear( GL_COLOR_BUFFER_BIT );
+    
+    glUseProgram( g->shader.program );
+    glBindTexture( GL_TEXTURE_2D, g->texture->id );
+    
+    glUniformMatrix4fv( g->shader.uniforms[PROJECTION_MATRIX], 1, GL_FALSE, MATRIX_VALUE( g->camera.projection ) );
+    glUniformMatrix4fv( g->shader.uniforms[VIEW_MATRIX], 1, GL_FALSE, MATRIX_VALUE( g->camera.view ) );
+    glUniform4f( g->shader.uniforms[COLOR], 1.0f, 1.0f, 1.0f, 1.0f );
+    
+    RenderText( &g->shader, &g->quadMesh, g->font, g->optionsScreen.title, MAKE_v2( 32, 32 ), MAKE_v4( 0.0f, 1.0f, 1.0f, 1.0f ) );
 }
 
 bool32_t GameInit( Memory* memory )
@@ -964,9 +1121,10 @@ bool32_t GameInit( Memory* memory )
     else
     {
         g->texture = LoadTexture( &g->assets, TILESHEET_PATH, TILESHEET_NAME );
+        g->arrowsTexture = LoadTexture( &g->assets, ARROWS_PATH, ARROWS_NAME );
         g->font = LoadFont( &g->assets, FONT_PATH, FONT_NAME );
 
-        if( !g->texture || !g->font )
+        if( !g->texture || !g->arrowsTexture || !g->font )
             result = false;
     }
 
@@ -974,7 +1132,7 @@ bool32_t GameInit( Memory* memory )
     {
         for( int x=0; x<GAME_MAP_WIDTH; x++ )
         {
-            g->map[TILE_INDEX(x,y)] = TILE_INDEX(x,y)+1;
+            g->map[TILE_INDEX(x,y)] = 1;
 
             p2 gridPoint = { x, y };
             if( !CreateMachine( &g->machines[TILE_INDEX(x,y)], gridPoint ) )
@@ -984,22 +1142,30 @@ bool32_t GameInit( Memory* memory )
         }
     }
 
+    p2 gridPoint = { 3, 0 };
+    PlaceMachine( g->machines, gridPoint, MACHINE_PROVIDER )->orientation = ORIENTATION_DOWN;
+    gridPoint.y = 9;
+    PlaceMachine( g->machines, gridPoint, MACHINE_COLLECTOR )->orientation = ORIENTATION_DOWN;
+
+    if( !CreateLevel( &g->level ) )
+        result = false;
+
     if( !CreateGUIRegion( &g->region, 32, 256, 256, 128 ) )
         result = false;
     if( !CreateGUIRegion( &g->childRegion, 0, 0, 256, 12 ) )
         result = false;
     AddChild( &g->region, &g->childRegion );
-	
-	// make screens
-	if( !CreateScreen( &g->mainScreen, "Main Menu", MainScreen_Update, MainScreen_Render ) )
-		result = false;
-	if( !CreateScreen( &g->optionsScreen, "Options", OptionsScreen_Update, OptionsScreen_Render ) )
-		result = false;
-	if( !CreateScreenBuffer( &g->screenBuffer ) )
-		result = false;
-	
-	PushScreen( &g->screenBuffer, &g->mainScreen );
-	PushScreen( &g->screenBuffer, &g->optionsScreen );
+    
+    // make screens
+    if( !CreateScreen( &g->mainScreen, "Main Menu", MainScreen_Update, MainScreen_Render ) )
+        result = false;
+    if( !CreateScreen( &g->optionsScreen, "Options", OptionsScreen_Update, OptionsScreen_Render ) )
+        result = false;
+    if( !CreateScreenBuffer( &g->screenBuffer ) )
+        result = false;
+    
+    PushScreen( &g->screenBuffer, &g->mainScreen );
+    PushScreen( &g->screenBuffer, &g->optionsScreen );
 
     glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
     glEnable( GL_BLEND );
@@ -1009,33 +1175,70 @@ bool32_t GameInit( Memory* memory )
 
 bool32_t GameUpdate( Memory* memory, Input* newInput, Input* oldInput, real64_t dt )
 {
-	bool32_t result = false;
-	
+    bool32_t result = false;
+    
     Gamestate* g = (Gamestate*)memory->pointer;
-	
-	if( g->screenBuffer.nscreens >  0 )
-	{
-		g->screenBuffer.curScreen->update( memory, newInput, oldInput, dt );
-		result = true;
-	}
-	
-    /*if( ButtonReleased( newInput, oldInput, BUTTON_LEFT ) )
+
+#if 0
+    if( g->screenBuffer.nscreens >  0 )
+    {
+        g->screenBuffer.curScreen->update( memory, newInput, oldInput, dt );
+        result = true;
+    }
+#else
+    if( ButtonReleased( newInput, oldInput, BUTTON_LEFT ) )
     {
         v2 mpos = newInput->mousePosition;
         v2 worldPos = ScreenToWorld( g->camera.position, mpos );
         p2 gridPoint = WorldToGrid( worldPos );
 
-        Machine* machine = PlaceMachine( g->machines, gridPoint, 2 );
+        Machine* machine = PlaceMachine( g->machines, gridPoint, MACHINE_CONVEYER_BELT );
         if( machine )
-            printf( "Placed machine at %d:%d\n", gridPoint.x, gridPoint.y );
+        {
+            printf( "Placed %d at %d:%d\n", machine, gridPoint.x, gridPoint.y );
+            machine->orientation = g->level.curOrientation;
+        }
         else
             printf( "Failed to place machine.\n" );
     }
 
-    UpdateGUIRegion( &g->region, newInput, oldInput, MAKE_v2(0,0) );
+    if( ButtonReleased( newInput, oldInput, BUTTON_RIGHT ) )
+    {
+        v2 mpos = newInput->mousePosition;
+        v2 worldPos = ScreenToWorld( g->camera.position, mpos );
+        p2 gridPoint = WorldToGrid( worldPos );
 
-    if( GUIRegionReleased( &g->childRegion ) )
-        printf( "Titlebar pressed.\n" );*/
+        Machine* machine = PlaceMachine( g->machines, gridPoint, MACHINE_ASSEMBLER );
+        if( machine )
+        {
+            printf( "Placed %d at %d:%d\n", machine, gridPoint.x, gridPoint.y );
+            machine->orientation = g->level.curOrientation;
+        }
+        else
+            printf( "Failed to place assembler.\n" );
+    }
+
+    if( KeyReleased( newInput, oldInput, KEY_SPACE ) )
+    {
+        g->level.running = !g->level.running;
+    }
+
+    if( KeyReleased( newInput, oldInput, KEY_ENTER ) )
+    {
+        g->level.curOrientation++;
+        if( g->level.curOrientation > ORIENTATION_DOWN )
+            g->level.curOrientation = ORIENTATION_LEFT;
+
+        printf( "Orientation: %d\n", g->level.curOrientation );
+    }
+
+    if( g->level.running )
+    {
+        UpdateLevel( &g->level, g->machines );
+    }
+    
+    result = true;
+#endif
     
     return result;
 }
@@ -1043,11 +1246,12 @@ bool32_t GameUpdate( Memory* memory, Input* newInput, Input* oldInput, real64_t 
 void GameRender( Memory* memory )
 {
     Gamestate* g = (Gamestate*)memory->pointer;
-	
-	if( g->screenBuffer.nscreens > 0 )
-		g->screenBuffer.curScreen->render( memory );
-    
-    /*glClearColor( 0.0f, 0.0f, 0.0f, 0.0f );
+
+#if 0
+    if( g->screenBuffer.nscreens > 0 )
+        g->screenBuffer.curScreen->render( memory );
+#else
+    glClearColor( 0.0f, 0.0f, 0.0f, 0.0f );
     glClear( GL_COLOR_BUFFER_BIT );
 
     glUseProgram( g->shader.program );
@@ -1061,16 +1265,13 @@ void GameRender( Memory* memory )
     {
         for( int x=0; x<GAME_MAP_WIDTH; x++ )
         {
-            //RenderTile( &g->shader, &g->quadMesh, g->map[TILE_INDEX(x,y)], MAKE_v2( x*TILE_SIZE, y*TILE_SIZE ) );
-            //RenderMachine( &g->shader, &g->quadMesh, &g->machines[TILE_INDEX(x,y)], MAKE_v2( x*TILE_SIZE, y*TILE_SIZE ) );
+            RenderTile( &g->shader, &g->quadMesh, g->texture,
+                        g->map[TILE_INDEX(x,y)], MAKE_v2( x*TILE_SIZE, y*TILE_SIZE ) );
+            RenderMachine( &g->shader, &g->quadMesh,
+                           g->texture, g->arrowsTexture,
+                           &g->machines[TILE_INDEX(x,y)],
+                           MAKE_v2( x*TILE_SIZE, y*TILE_SIZE ) );
         }
     }
-
-    RenderText( &g->shader, &g->quadMesh, g->font,
-                "Testing...\nMore testing...",
-                MAKE_v2( 0, 0 ),
-                MAKE_v4( 0.0f, 1.0f, 0.0f, 1.0f ) );
-
-    glBindTexture( GL_TEXTURE_2D, g->texture->id );
-    RenderGUIRegion( &g->shader, &g->quadMesh, &g->region, MAKE_v2(0,0) );*/
+#endif
 }
