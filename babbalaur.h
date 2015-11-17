@@ -26,6 +26,12 @@
 #define ARROWS_NAME "Arrows"
 #define FONT_PATH "./fonts/verdana24.txt"
 #define FONT_NAME "Verdana24"
+#define CONVEYER_PATH "./textures/conveyer.png"
+#define CONVEYER_NAME "Conveyer"
+#define CONVEYER_DOWN_ANIMATION_PATH "./animations/conveyer_down.txt"
+#define CONVEYER_UP_ANIMATION_PATH "./animations/conveyer_up.txt"
+#define CONVEYER_LEFT_ANIMATION_PATH "./animations/conveyer_left.txt"
+#define CONVEYER_RIGHT_ANIMATION_PATH "./animations/conveyer_right.txt"
 
 #define WINDOW_X SDL_WINDOWPOS_UNDEFINED
 #define WINDOW_Y SDL_WINDOWPOS_UNDEFINED
@@ -177,6 +183,30 @@ typedef struct CameraTag
     m4 view;
 } Camera;
 
+typedef struct FrameTag
+{
+    v2 offset;
+    real32_t length;
+    real32_t delay;
+} Frame;
+
+#define ANIMATION_MAX_FRAMES 4
+typedef struct AnimationTag
+{
+    Frame frames[ANIMATION_MAX_FRAMES];
+    int nframes;
+    int current;
+    real32_t elapsed;
+} Animation;
+
+#define ANIMATOR_MAX_ANIMATIONS 4
+typedef struct AnimatorTag
+{
+    Animation animations[ANIMATOR_MAX_ANIMATIONS];
+    int nanimations;
+    int current;
+} Animator;
+
 enum
 {
     ORIENTATION_LEFT = 0,
@@ -226,6 +256,7 @@ typedef struct MachineTag
     int ninParts;
     Part outBuffer[MACHINE_MAX_PARTS];
     int noutParts;
+    Animator animator;
 } Machine;
 
 #define LEVEL_DELAY 150
@@ -279,6 +310,7 @@ typedef struct GamestateTag
     Assets assets;
     Texture* texture;
     Texture* arrowsTexture;
+    Texture* conveyerTexture;
     Font* font;
     uint8_t map[GAME_MAP_HEIGHT*GAME_MAP_WIDTH];
     Machine machines[MACHINE_MAX];

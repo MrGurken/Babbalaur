@@ -341,30 +341,30 @@ TEST( Machine, PlaceMachine )
 
     // test valid placement
     p2 gridPoint = { 1, 0 };
-    ASSERT_NE( nullptr, PlaceMachine( machines, gridPoint, 2 ) );
+    ASSERT_NE( nullptr, PlaceMachine( machines, gridPoint, 2 , 0 ) );
     EXPECT_EQ( 2, machines[1].type );
 
     // test out of bounds, underflow, y only
     gridPoint.y = -1;
-    ASSERT_EQ( nullptr, PlaceMachine( machines, gridPoint, 2 ) );
+    ASSERT_EQ( nullptr, PlaceMachine( machines, gridPoint, 2, 0 ) );
 
     // test out of bounds, underflow, x only
     gridPoint.y = 0;
     gridPoint.x = -1;
-    ASSERT_EQ( nullptr, PlaceMachine( machines, gridPoint, 2 ) );
+    ASSERT_EQ( nullptr, PlaceMachine( machines, gridPoint, 2, 0 ) );
 
     // test out of bounds, overflow, x only
     gridPoint.x = GAME_MAP_WIDTH+1;
-    ASSERT_EQ( nullptr, PlaceMachine( machines, gridPoint, 2 ) );
+    ASSERT_EQ( nullptr, PlaceMachine( machines, gridPoint, 2, 0 ) );
 
     // test out of bounds, overflow, y only
     gridPoint.x = 0;
     gridPoint.y = GAME_MAP_HEIGHT+1;
-    ASSERT_EQ( nullptr, PlaceMachine( machines, gridPoint, 2 ) );
+    ASSERT_EQ( nullptr, PlaceMachine( machines, gridPoint, 2, 0 ) );
 
     // test placement on occupied tile
     gridPoint.y = 0;
-    ASSERT_EQ( nullptr, PlaceMachine( machines, gridPoint, 2 ) );
+    ASSERT_EQ( nullptr, PlaceMachine( machines, gridPoint, 2, 0 ) );
     EXPECT_EQ( 1, machines[0].type );
 }
 

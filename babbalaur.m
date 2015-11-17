@@ -575,6 +575,103 @@ bool32_t CreateCamera( Camera* camera )
     return true;
 }
 
+bool32_t CreateFrame( Frame* frame )
+{
+    frame->offset.x = frame->offset.y = 0.0f;
+    frame->length = frame->delay = 0.0f;
+
+    return true;
+}
+
+bool32_t CreateAnimation( Animation* animation )
+{
+    for( int i=0; i<ANIMATION_MAX_FRAMES; i++ )
+        if( !CreateFrame( &animation->frames[i] ) )
+            return false;
+
+    animation->nframes = 0;
+    animation->current = 0;
+    animation->elapsed = 0.0f;
+
+    return true;
+}
+
+bool32_t LoadAnimation( Animation* animation, const char* file )
+{
+    bool32_t result = false;
+    
+    std::ifstream stream( file );
+    if( stream.is_open() )
+    {
+        stream >> animation->nframes;
+        for( int i=0; i<animation->nframes; i++ )
+        {
+            stream >> animation->frames[i].offset.x;
+            stream >> animation->frames[i].offset.y;
+            stream >> animation->frames[i].length;
+            stream >> animation->frames[i].delay;
+        }
+        
+        stream.close();
+        result = true;
+    }
+
+    return result;
+}
+
+void UpdateAnimation( Animation* animation, real32_t dt )
+{
+    if( animation->nframes > 0 )
+    {
+        animation->elapsed += dt;
+
+        if( animation->elapsed > animation->frames[animation->current].delay )
+        {
+            animation->elapsed -= animation->frames[animation->current].delay;
+            
+            animation->current++;
+            if( animation->current >= animation->nframes )
+                animation->current = 0;
+        }
+    }
+}
+
+bool32_t CreateAnimator( Animator* animator )
+{
+    for( int i=0; i<ANIMATOR_MAX_ANIMATIONS; i++ )
+        if( !CreateAnimation( &animator->animations[i] ) )
+            return false;
+
+    animator->nanimations = 0;
+    animator->current = 0;
+
+    return true;
+}
+
+void UpdateAnimator( Animator* animator, real32_t dt )
+{
+    if( animator->nanimations > 0 )
+    {
+        UpdateAnimation( &animator->animations[animator->current], dt );
+    }
+}
+
+bool32_t GetCurrentFrame( Animator* animator, Frame* frame )
+{
+    bool32_t result = false;
+
+    if( animator->nanimations > 0 )
+    {
+        if( animator->animations[animator->current].nframes > 0 )
+        {
+            *frame = animator->animations[animator->current].frames[animator->animations[animator->current].current];
+            result = true;
+        }
+    }
+    
+    return result;
+}
+
 uint8_t GetTileID( uint8_t* map, int x, int y )
 {
     return map[y*GAME_MAP_WIDTH+x];
@@ -706,13 +803,15 @@ Machine* NextMachine( Machine* machines, p2 gridPoint )
     return GridToMachine( machines, gridPoint );
 }
 
-Machine* PlaceMachine( Machine* machines, p2 gridPoint, int type )
+Machine* PlaceMachine( Machine* machines, p2 gridPoint, int type, int orientation )
 {
     Machine* machine = GridToMachine( machines, gridPoint );
     if( machine && !machine->alive )
     {
         machine->alive = true;
         machine->type = type;
+        machine->orientation = orientation;
+        machine->animator.current = orientation;
     }
     else
         machine = 0;
@@ -723,9 +822,9 @@ bool32_t PushPart( Machine* machine, Part part )
 {
     bool32_t result = false;
 
-    if( machine->nparts < MACHINE_MAX_PARTS )
+    if( machine->ninParts < MACHINE_MAX_PARTS )
     {
-        machine->parts[machine->nparts++] = part;
+        machine->inBuffer[machine->ninParts++] = part;
         result = true;
     }
 
@@ -736,11 +835,11 @@ bool32_t PopPart( Machine* machine )
 {
     bool32_t result = false;
 
-    if( machine->nparts > 0 )
+    if( machine->ninParts > 0 )
     {
-        for( int i=0; i<machine->nparts-1; i++ )
-            machine->parts[i] = machine->parts[i+1];
-        machine->nparts--;
+        for( int i=0; i<machine->ninParts-1; i++ )
+            machine->inBuffer[i] = machine->inBuffer[i+1];
+        machine->ninParts--;
         
         result = true;
     }
@@ -755,33 +854,47 @@ bool32_t CreateMachine( Machine* machine, p2 gridPoint )
     machine->alive = false;
     machine->type = 1;
     machine->delay = MACHINE_DELAY;
-    machine->nparts = 0;
+    machine->ninParts = 0;
+    machine->noutParts = 0;
 
-    return true;
+    return CreateAnimator( &machine->animator );
 }
 
 void RenderMachine( Shader* shader, Mesh* mesh,
-                    Texture* tilesheet, Texture* arrows,
+                    Texture* conveyerTexture, Texture* arrows,
                     Machine* machine, v2 position )
 {
     if( machine->alive )
     {
+        // render machine
         m4 modelMatrix = MATRIX_MULTIPLY( MATRIX_TRANSLATION( position.x, position.y, 0.0f ), MATRIX_SCALE( TILE_SIZE, TILE_SIZE, 1.0f ) );
         glUniformMatrix4fv( shader->uniforms[MODEL_MATRIX], 1, GL_FALSE, MATRIX_VALUE(modelMatrix) );
 
-        v2 offset = GetTileOffset( machine->type );
+        /*v2 offset = GetTileOffset( machine->type );
         glUniform2f( shader->uniforms[UV_OFFSET], offset.x, offset.y );
-        glUniform1f( shader->uniforms[UV_LENGTH], TILE_UV_LENGTH );
+        glUniform1f( shader->uniforms[UV_LENGTH], TILE_UV_LENGTH );*/
 
-        if( machine->nparts > 0 )
+        Frame frame;
+        GetCurrentFrame( &machine->animator, &frame );
+
+        frame.offset.x /= (real32_t)conveyerTexture->width;
+        frame.offset.y /= (real32_t)conveyerTexture->height;
+        frame.length /= (real32_t)conveyerTexture->width;
+        
+        glUniform2f( shader->uniforms[UV_OFFSET], frame.offset.x, frame.offset.y );
+        glUniform1f( shader->uniforms[UV_LENGTH], frame.length );
+
+        if( machine->ninParts > 0 )
             glUniform4f( shader->uniforms[COLOR], 1.0f, 0.0f, 0.0f, 1.0f );
         else
             glUniform4f( shader->uniforms[COLOR], 1.0f, 1.0f, 1.0f, 1.0f );
 
-        glBindTexture( GL_TEXTURE_2D, tilesheet->id );
+        glBindTexture( GL_TEXTURE_2D, conveyerTexture->id );
 
         RenderMesh( mesh );
 
+        // render arrow
+        v2 offset;
         offset.x = (real32_t)( machine->orientation % 2 );
         offset.y = (real32_t)( machine->orientation / 2 );
         glUniform2f( shader->uniforms[UV_OFFSET], offset.x*0.5f, offset.y*0.5f );
@@ -837,7 +950,7 @@ void UpdateLevel( Level* level, Machine* machines )
             if( machines[i].alive )
             {
                 int minRequired = ( machines[i].type == MACHINE_ASSEMBLER ? 1 : 0 );
-                if( machines[i].nparts > minRequired )
+                if( machines[i].ninParts > minRequired )
                 {
                     if( machines[i].delay <= 0 )
                     {
@@ -1122,11 +1235,25 @@ bool32_t GameInit( Memory* memory )
     {
         g->texture = LoadTexture( &g->assets, TILESHEET_PATH, TILESHEET_NAME );
         g->arrowsTexture = LoadTexture( &g->assets, ARROWS_PATH, ARROWS_NAME );
+        g->conveyerTexture = LoadTexture( &g->assets, CONVEYER_PATH, CONVEYER_NAME );
         g->font = LoadFont( &g->assets, FONT_PATH, FONT_NAME );
 
         if( !g->texture || !g->arrowsTexture || !g->font )
             result = false;
     }
+
+    Animator animator;
+    if( !CreateAnimator( &animator ) )
+        result = false;
+    if( !LoadAnimation( &animator.animations[ORIENTATION_LEFT], CONVEYER_LEFT_ANIMATION_PATH ) )
+        result = false;
+    if( !LoadAnimation( &animator.animations[ORIENTATION_RIGHT], CONVEYER_RIGHT_ANIMATION_PATH ) )
+        result = false;
+    if( !LoadAnimation( &animator.animations[ORIENTATION_UP], CONVEYER_UP_ANIMATION_PATH ) )
+        result = false;
+    if( !LoadAnimation( &animator.animations[ORIENTATION_DOWN], CONVEYER_DOWN_ANIMATION_PATH ) )
+        result = false;
+    animator.nanimations = 4;
 
     for( int y=0; y<GAME_MAP_HEIGHT; y++ )
     {
@@ -1135,17 +1262,22 @@ bool32_t GameInit( Memory* memory )
             g->map[TILE_INDEX(x,y)] = 1;
 
             p2 gridPoint = { x, y };
-            if( !CreateMachine( &g->machines[TILE_INDEX(x,y)], gridPoint ) )
+            int index = TILE_INDEX(x,y);
+            if( CreateMachine( &g->machines[index], gridPoint ) )
+            {
+                g->machines[index].animator = animator;
+            }
+            else
             {
                 result = false;
             }
         }
-    }
+    }    
 
     p2 gridPoint = { 3, 0 };
-    PlaceMachine( g->machines, gridPoint, MACHINE_PROVIDER )->orientation = ORIENTATION_DOWN;
+    PlaceMachine( g->machines, gridPoint, MACHINE_PROVIDER, ORIENTATION_DOWN );
     gridPoint.y = 9;
-    PlaceMachine( g->machines, gridPoint, MACHINE_COLLECTOR )->orientation = ORIENTATION_DOWN;
+    PlaceMachine( g->machines, gridPoint, MACHINE_COLLECTOR, ORIENTATION_DOWN );
 
     if( !CreateLevel( &g->level ) )
         result = false;
@@ -1192,11 +1324,10 @@ bool32_t GameUpdate( Memory* memory, Input* newInput, Input* oldInput, real64_t 
         v2 worldPos = ScreenToWorld( g->camera.position, mpos );
         p2 gridPoint = WorldToGrid( worldPos );
 
-        Machine* machine = PlaceMachine( g->machines, gridPoint, MACHINE_CONVEYER_BELT );
+        Machine* machine = PlaceMachine( g->machines, gridPoint, MACHINE_CONVEYER_BELT, g->level.curOrientation );
         if( machine )
         {
             printf( "Placed %d at %d:%d\n", machine, gridPoint.x, gridPoint.y );
-            machine->orientation = g->level.curOrientation;
         }
         else
             printf( "Failed to place machine.\n" );
@@ -1208,11 +1339,10 @@ bool32_t GameUpdate( Memory* memory, Input* newInput, Input* oldInput, real64_t 
         v2 worldPos = ScreenToWorld( g->camera.position, mpos );
         p2 gridPoint = WorldToGrid( worldPos );
 
-        Machine* machine = PlaceMachine( g->machines, gridPoint, MACHINE_ASSEMBLER );
+        Machine* machine = PlaceMachine( g->machines, gridPoint, MACHINE_ASSEMBLER, g->level.curOrientation );
         if( machine )
         {
             printf( "Placed %d at %d:%d\n", machine, gridPoint.x, gridPoint.y );
-            machine->orientation = g->level.curOrientation;
         }
         else
             printf( "Failed to place assembler.\n" );
@@ -1230,6 +1360,14 @@ bool32_t GameUpdate( Memory* memory, Input* newInput, Input* oldInput, real64_t 
             g->level.curOrientation = ORIENTATION_LEFT;
 
         printf( "Orientation: %d\n", g->level.curOrientation );
+    }
+
+    for( int i=0; i<MACHINE_MAX; i++ )
+    {
+        //if( g->machines[i].alive )
+        {
+            UpdateAnimator( &g->machines[i].animator, dt );
+        }
     }
 
     if( g->level.running )
@@ -1268,7 +1406,7 @@ void GameRender( Memory* memory )
             RenderTile( &g->shader, &g->quadMesh, g->texture,
                         g->map[TILE_INDEX(x,y)], MAKE_v2( x*TILE_SIZE, y*TILE_SIZE ) );
             RenderMachine( &g->shader, &g->quadMesh,
-                           g->texture, g->arrowsTexture,
+                           g->conveyerTexture, g->arrowsTexture,
                            &g->machines[TILE_INDEX(x,y)],
                            MAKE_v2( x*TILE_SIZE, y*TILE_SIZE ) );
         }
