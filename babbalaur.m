@@ -100,14 +100,17 @@ bool32_t ReadFile( const char* file, const char* fileType, Memory* memory )
     bool32_t result = false;
     
     NSString* path = [[NSBundle mainBundle] pathForResource:[NSString stringWithUTF8String:file] ofType:[NSString stringWithUTF8String:fileType]];
-    NSString* content = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil];
-    if( content.length < memory->size )
-    {
-        memcpy( memory->pointer, [content UTF8String], content.length );
-        ((char*)memory->pointer)[content.length] = 0; // null terminate string
-        result = true;
-    }
-    
+	if( path )
+	{
+		NSString* content = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil];
+		if( content && content.length < memory->size )
+		{
+			memcpy( memory->pointer, [content UTF8String], content.length );
+			((char*)memory->pointer)[content.length] = 0; // null terminate string
+			result = true;
+		}
+	}
+	
     return result;
 }
 #endif
@@ -596,6 +599,7 @@ bool32_t CreateAnimation( Animation* animation )
     return true;
 }
 
+#ifdef WIN32
 bool32_t LoadAnimation( Animation* animation, const char* file )
 {
     bool32_t result = false;
@@ -618,6 +622,115 @@ bool32_t LoadAnimation( Animation* animation, const char* file )
 
     return result;
 }
+#else
+bool32_t IsDigit( char c )
+{
+	return ( c >= '0' && c <= '9' );
+}
+
+bool32_t IsWhitespace( char c )
+{
+	return ( c == ' ' || c == '\t' ||
+			c == '\r' || c == '\n' );
+}
+
+bool32_t IsDelimiter( char c )
+{
+	return ( c == ',' || c == '.' );
+}
+
+int32_t ReadInt32( char** str )
+{
+	int32_t result = 0;
+	bool negative = false;
+	
+	while( IsWhitespace( **str ) || IsDelimiter( **str ) )
+		(*str)++;
+	
+	if( *str[0] == '-' )
+	{
+		negative = true;
+		(*str)++;
+	}
+	
+	while( IsDigit( **str ) )
+	{
+		result *= 10;
+		result += **str - '0';
+		(*str)++;
+	}
+	
+	return ( negative ? -result : result );
+}
+
+real32_t ReadReal32( char** str )
+{
+	real32_t result = 0.0f;
+	bool negative = false;
+	
+	while( IsWhitespace( **str ) || IsDelimiter( **str ) )
+		(*str)++;
+	
+	if( *str[0] == '-' )
+	{
+		negative = true;
+		(*str)++;
+	}
+	
+	// read whole part
+	while( IsDigit( **str ) )
+	{
+		result *= 10;
+		result += **str - '0';
+		(*str)++;
+	}
+	
+	if( IsDelimiter( **str ) )
+	{
+		(*str)++;
+		
+		// read fraction part
+		real32_t pos = 0.1f;
+		while( IsDigit( **str ) )
+		{
+			result += (real32_t)(**str - '0') * pos;
+			pos *= 0.1f;
+			(*str)++;
+		}
+	}
+	
+	return ( negative ? -result : result );
+}
+
+bool32_t LoadAnimation( Animation* animation, const char* file, Memory* memory )
+{
+	bool32_t result = false;
+	
+	if( ReadFile( file, "txt", memory ) )
+	{
+		char* ptr = (char*)memory->pointer;
+		
+		int nframes = ReadInt32( &ptr );
+		animation->nframes = nframes;
+		for( int i=0; i<nframes; i++ )
+		{
+			real32_t xoffset = ReadReal32( &ptr );
+			real32_t yoffset = ReadReal32( &ptr );
+			real32_t length = ReadReal32( &ptr );
+			real32_t delay = ReadReal32( &ptr );
+			
+			animation->frames[i].offset.x = xoffset;
+			animation->frames[i].offset.y = yoffset;
+			animation->frames[i].length = length;
+			animation->frames[i].delay = delay;
+		}
+		
+		result = true;
+	}
+	
+	return result;
+}
+#endif
 
 void UpdateAnimation( Animation* animation, real32_t dt )
 {
@@ -1255,13 +1368,13 @@ bool32_t GameInit( Memory* memory )
 
     if( !CreateAnimator( &g->machineAnimator ) )
         result = false;
-    if( !LoadAnimation( &g->machineAnimator.animations[ORIENTATION_LEFT], CONVEYER_LEFT_ANIMATION_PATH ) )
+    if( !LoadAnimation( &g->machineAnimator.animations[ORIENTATION_LEFT], CONVEYER_LEFT_ANIMATION_PATH, &g->memory ) )
         result = false;
-    if( !LoadAnimation( &g->machineAnimator.animations[ORIENTATION_RIGHT], CONVEYER_RIGHT_ANIMATION_PATH ) )
+    if( !LoadAnimation( &g->machineAnimator.animations[ORIENTATION_RIGHT], CONVEYER_RIGHT_ANIMATION_PATH, &g->memory ) )
         result = false;
-    if( !LoadAnimation( &g->machineAnimator.animations[ORIENTATION_UP], CONVEYER_UP_ANIMATION_PATH ) )
+    if( !LoadAnimation( &g->machineAnimator.animations[ORIENTATION_UP], CONVEYER_UP_ANIMATION_PATH, &g->memory ) )
         result = false;
-    if( !LoadAnimation( &g->machineAnimator.animations[ORIENTATION_DOWN], CONVEYER_DOWN_ANIMATION_PATH ) )
+    if( !LoadAnimation( &g->machineAnimator.animations[ORIENTATION_DOWN], CONVEYER_DOWN_ANIMATION_PATH, &g->memory ) )
         result = false;
     g->machineAnimator.nanimations = 4;
 

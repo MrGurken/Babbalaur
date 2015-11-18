@@ -44,8 +44,16 @@
 #define DIFFUSE_FS_PATH "diffuse"
 #define TILESHEET_PATH "tilesheet"
 #define TILESHEET_NAME "Tilesheet"
+#define ARROWS_PATH "arrows"
+#define ARROWS_NAME "Arrows"
 #define FONT_PATH "verdana24"
 #define FONT_NAME "Verdana24"
+#define CONVEYER_PATH "conveyer"
+#define CONVEYER_NAME "Conveyer"
+#define CONVEYER_DOWN_ANIMATION_PATH "conveyer_down"
+#define CONVEYER_UP_ANIMATION_PATH "conveyer_up"
+#define CONVEYER_LEFT_ANIMATION_PATH "conveyer_left"
+#define CONVEYER_RIGHT_ANIMATION_PATH "conveyer_right"
 
 #define WINDOW_X 32
 #define WINDOW_Y 32
