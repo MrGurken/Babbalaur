@@ -204,7 +204,6 @@ typedef struct AnimatorTag
 {
     Animation animations[ANIMATOR_MAX_ANIMATIONS];
     int nanimations;
-    int current;
 } Animator;
 
 enum
@@ -256,7 +255,7 @@ typedef struct MachineTag
     int ninParts;
     Part outBuffer[MACHINE_MAX_PARTS];
     int noutParts;
-    Animator animator;
+    //Animator animator;
 } Machine;
 
 #define LEVEL_DELAY 150
@@ -314,6 +313,7 @@ typedef struct GamestateTag
     Font* font;
     uint8_t map[GAME_MAP_HEIGHT*GAME_MAP_WIDTH];
     Machine machines[MACHINE_MAX];
+    Animator machineAnimator;
     Level level;
     GUIRegion region;
     GUIRegion childRegion;

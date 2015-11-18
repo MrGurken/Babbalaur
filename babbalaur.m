@@ -643,28 +643,25 @@ bool32_t CreateAnimator( Animator* animator )
             return false;
 
     animator->nanimations = 0;
-    animator->current = 0;
 
     return true;
 }
 
 void UpdateAnimator( Animator* animator, real32_t dt )
 {
-    if( animator->nanimations > 0 )
-    {
-        UpdateAnimation( &animator->animations[animator->current], dt );
-    }
+    for( int i=0; i<animator->nanimations; i++ )
+        UpdateAnimation( &animator->animations[i], dt );
 }
 
-bool32_t GetCurrentFrame( Animator* animator, Frame* frame )
+bool32_t GetCurrentFrame( Animator* animator, Frame* frame, int index )
 {
     bool32_t result = false;
 
     if( animator->nanimations > 0 )
     {
-        if( animator->animations[animator->current].nframes > 0 )
+        if( animator->animations[index].nframes > 0 )
         {
-            *frame = animator->animations[animator->current].frames[animator->animations[animator->current].current];
+            *frame = animator->animations[index].frames[animator->animations[index].current];
             result = true;
         }
     }
@@ -811,7 +808,7 @@ Machine* PlaceMachine( Machine* machines, p2 gridPoint, int type, int orientatio
         machine->alive = true;
         machine->type = type;
         machine->orientation = orientation;
-        machine->animator.current = orientation;
+        //machine->animator.current = orientation;
     }
     else
         machine = 0;
@@ -857,11 +854,12 @@ bool32_t CreateMachine( Machine* machine, p2 gridPoint )
     machine->ninParts = 0;
     machine->noutParts = 0;
 
-    return CreateAnimator( &machine->animator );
+    return true; //CreateAnimator( &machine->animator );
 }
 
 void RenderMachine( Shader* shader, Mesh* mesh,
                     Texture* conveyerTexture, Texture* arrows,
+                    Animator* animator,
                     Machine* machine, v2 position )
 {
     if( machine->alive )
@@ -875,7 +873,7 @@ void RenderMachine( Shader* shader, Mesh* mesh,
         glUniform1f( shader->uniforms[UV_LENGTH], TILE_UV_LENGTH );*/
 
         Frame frame;
-        GetCurrentFrame( &machine->animator, &frame );
+        GetCurrentFrame( animator, &frame, machine->orientation );
 
         frame.offset.x /= (real32_t)conveyerTexture->width;
         frame.offset.y /= (real32_t)conveyerTexture->height;
@@ -1242,7 +1240,7 @@ bool32_t GameInit( Memory* memory )
             result = false;
     }
 
-    Animator animator;
+    /*Animator animator;
     if( !CreateAnimator( &animator ) )
         result = false;
     if( !LoadAnimation( &animator.animations[ORIENTATION_LEFT], CONVEYER_LEFT_ANIMATION_PATH ) )
@@ -1253,7 +1251,19 @@ bool32_t GameInit( Memory* memory )
         result = false;
     if( !LoadAnimation( &animator.animations[ORIENTATION_DOWN], CONVEYER_DOWN_ANIMATION_PATH ) )
         result = false;
-    animator.nanimations = 4;
+        animator.nanimations = 4;*/
+
+    if( !CreateAnimator( &g->machineAnimator ) )
+        result = false;
+    if( !LoadAnimation( &g->machineAnimator.animations[ORIENTATION_LEFT], CONVEYER_LEFT_ANIMATION_PATH ) )
+        result = false;
+    if( !LoadAnimation( &g->machineAnimator.animations[ORIENTATION_RIGHT], CONVEYER_RIGHT_ANIMATION_PATH ) )
+        result = false;
+    if( !LoadAnimation( &g->machineAnimator.animations[ORIENTATION_UP], CONVEYER_UP_ANIMATION_PATH ) )
+        result = false;
+    if( !LoadAnimation( &g->machineAnimator.animations[ORIENTATION_DOWN], CONVEYER_DOWN_ANIMATION_PATH ) )
+        result = false;
+    g->machineAnimator.nanimations = 4;
 
     for( int y=0; y<GAME_MAP_HEIGHT; y++ )
     {
@@ -1263,14 +1273,8 @@ bool32_t GameInit( Memory* memory )
 
             p2 gridPoint = { x, y };
             int index = TILE_INDEX(x,y);
-            if( CreateMachine( &g->machines[index], gridPoint ) )
-            {
-                g->machines[index].animator = animator;
-            }
-            else
-            {
+            if( !CreateMachine( &g->machines[index], gridPoint ) )
                 result = false;
-            }
         }
     }    
 
@@ -1362,13 +1366,15 @@ bool32_t GameUpdate( Memory* memory, Input* newInput, Input* oldInput, real64_t 
         printf( "Orientation: %d\n", g->level.curOrientation );
     }
 
-    for( int i=0; i<MACHINE_MAX; i++ )
+    /*for( int i=0; i<MACHINE_MAX; i++ )
     {
         //if( g->machines[i].alive )
         {
             UpdateAnimator( &g->machines[i].animator, dt );
         }
-    }
+        }*/
+
+    UpdateAnimator( &g->machineAnimator, dt );
 
     if( g->level.running )
     {
@@ -1407,6 +1413,7 @@ void GameRender( Memory* memory )
                         g->map[TILE_INDEX(x,y)], MAKE_v2( x*TILE_SIZE, y*TILE_SIZE ) );
             RenderMachine( &g->shader, &g->quadMesh,
                            g->conveyerTexture, g->arrowsTexture,
+                           &g->machineAnimator,
                            &g->machines[TILE_INDEX(x,y)],
                            MAKE_v2( x*TILE_SIZE, y*TILE_SIZE ) );
         }
